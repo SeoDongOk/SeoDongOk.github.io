@@ -1,0 +1,7 @@
+.next
+.contentlayer
+.yarn
+node_modules
+dist
+out
+coverage

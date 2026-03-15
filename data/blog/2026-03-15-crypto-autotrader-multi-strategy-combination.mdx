@@ -1,0 +1,157 @@
+---
+title: '암호화폐 자동매매 봇 — 다중 전략 결합 시스템 설계'
+date: '2026-03-15'
+tags: ['quantitative-trading', 'python', 'binance', 'algorithm', 'strategy']
+draft: false
+summary: '바이낸스 선물 자동매매 봇에 다중 전략 결합(Combination Strategy), 볼린저 밴드 이탈 전략, 박스권 횡보 전략, 트레일링 스탑을 추가한 과정을 기록합니다.'
+---
+
+## 오늘 한 것
+
+퀀트 자동매매 봇 `sdo_auto_trader_crypto`에 크게 4가지를 추가했다.
+
+1. **CombinationStrategy** — 여러 전략 신호를 가중치로 결합
+2. **BollingerBreakoutStrategy** — 밴드 이탈 + RSI + ATR 3중 필터
+3. **SidewaysRangeStrategy** — 박스권 지지/저항 범위 매매
+4. **트레일링 스탑** — 고정 익절 대신 고점 추적으로 수익 극대화
+
+---
+
+## 1. 왜 전략을 결합했는가
+
+기존에는 SDO v2 단일 전략으로만 거래했다.
+SDO v2는 **눌림목 반전** 전략이다 — 4틱 같은 방향 + 2틱 반전 패턴을 찾고, 20시간 전 가격과 비교해 추세 방향을 결정한다.
+
+문제는 하나의 전략은 하나의 시장 상황에서만 잘 작동한다는 것.
+
+```
+SDO v2  → 추세장에서 강함
+볼린저  → 밴드 반전에서 강함
+RSI     → 과매수/과매도 구간에서 강함
+```
+
+이것들을 결합하면 더 강한 필터가 생긴다.
+
+---
+
+## 2. CombinationStrategy 설계
+
+핵심 아이디어는 단순하다.
+
+```python
+점수 = Σ (각 전략 신호 × 가중치)
+BUY  신호: BUY  = +weight
+SELL 신호: SELL = -weight
+HOLD 신호: 0
+```
+
+합산 점수가 임계값을 넘으면 진입, 미달이면 대기.
+
+```python
+combo = CombinationStrategy(
+    strategies=[
+        StrategyWeight(SDOStrategyV2(), weight=4.0),  # 핵심
+        StrategyWeight(BollingerStrategy(), weight=2.0),
+        StrategyWeight(RSIStrategy(), weight=2.0),
+    ],
+    buy_threshold=4.0,   # SDO v2 없이는 진입 불가 (weight=4.0이므로)
+    sell_threshold=4.0,
+    min_agreeing=2,      # 최소 2개 전략 동의 필수
+)
+```
+
+`buy_threshold=4.0`으로 설정하면 SDO v2 단독(4.0)은 통과 못한다 (`>` 연산).
+SDO v2(4.0) + 볼린저(2.0) = 6.0이어야 진입된다. **SDO v2 없이는 진입 불가.**
+
+---
+
+## 3. 박스권 전략 추가 — 주말은 boxing
+
+경험상 **주말 암호화폐 시장은 거래량이 낮고 박스권 형성이 잦다**.
+
+SDO v2는 min_trend_pct 필터로 횡보장에서는 HOLD를 낸다. 그래서 주말에는 기회를 놓친다.
+
+`SidewaysRangeStrategy`는 이걸 보완한다.
+
+```
+박스권 감지 조건 (3중 필터):
+  ① 최근 20캔들 가격 범위 ≤ 6%   → 횡보 확인
+  ② ATR% ≥ 0.1%                  → 죽은 시장 제외
+  ③ ATR% ≤ 1.5%                  → 추세장 제외
+
+진입:
+  가격이 박스 하단 25% 이내 + RSI < 45  → BUY  (지지선 반등)
+  가격이 박스 상단 25% 이내 + RSI > 55  → SELL (저항선 하락)
+```
+
+SDO v2 + SidewaysRange 조합이면 두 전략이 서로 반대 조건에서 발동된다.
+
+```
+추세장 → SDO v2 BUY/SELL, SidewaysRange HOLD (ATR 높아서)
+횡보장 → SDO v2 HOLD (20h 추세 없음), SidewaysRange BUY/SELL
+```
+
+자연스럽게 시장에 맞는 전략이 선택된다.
+
+---
+
+## 4. 트레일링 스탑 — 수익 극대화
+
+기존 시스템은 고정 익절(+50%)이었다. 추세가 강하게 이어져도 50%에서 청산됐다.
+
+트레일링 스탑으로 바꿨다.
+
+```
+진입가 50,000
+
+가격 51,000 (+2%) → 트레일링 활성화 (activation=1.5%)
+  SL = 51,000 × (1 - 1.0%) = 50,490
+
+가격 55,000 (+10%) → SL 자동 이동
+  SL = 55,000 × (1 - 1.0%) = 54,450
+
+가격 60,000 (+20%) → SL 계속 이동
+  SL = 60,000 × (1 - 1.0%) = 59,400
+
+가격 59,000 하락 → SL(59,400) 터치 → 청산
+  실현 수익: +18%  (고정 익절이었다면 +10%에서 끝났을 것)
+```
+
+---
+
+## 5. 전략 선택 결론
+
+단일 전략 vs 결합 전략 중 고민이 있었다.
+
+결론은: **SDO v2 단독이 가장 깔끔하지만, 결합이 더 많은 시장을 커버한다.**
+
+|             | SDO v2 단독 | Combination          |
+| ----------- | ----------- | -------------------- |
+| 추세장      | 강함        | 강함                 |
+| 횡보장      | 약함 (차단) | SidewaysRange가 커버 |
+| 신호 명확성 | 높음        | 약간 복잡            |
+| 오신호 위험 | 낮음        | 더 낮음 (다중 필터)  |
+
+**권장 설정:**
+
+```env
+STRATEGY=combination
+COMBO_STRATEGIES=sdo_v2=4.0,sideways_range=3.0
+COMBO_BUY_THRESHOLD=3.0
+COMBO_SELL_THRESHOLD=3.0
+COMBO_MIN_AGREEING=1
+
+TRAILING_STOP_ENABLED=True
+TRAIL_ACTIVATION_PCT=1.5
+TRAIL_DISTANCE_PCT=1.0
+```
+
+---
+
+## 오늘의 배움
+
+> 전략의 성격이 맞는 것끼리 결합해야 한다.
+> 반전형(SDO v2, RSI, 볼린저 반전)과 돌파형(볼린저 브레이크아웃)을 섞으면 서로 충돌한다.
+> 같은 철학의 전략들이 서로를 강화할 때 진짜 결합의 의미가 있다.
+
+퀀트의 길은 멀다. 하지만 매일 한 줄씩.

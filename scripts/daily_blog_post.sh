@@ -105,9 +105,19 @@ fi
 git commit -m "blog: ${DATE} 퀀트 개발 일지 자동 포스팅"
 log "커밋 완료"
 
-# 원격 변경사항을 먼저 받아온 뒤 푸시
-git pull --rebase origin main
+# dev 브랜치 푸시
+git push origin dev
+log "dev 푸시 완료"
+
+# main 브랜치에 머지 후 배포
+git checkout main
+git pull origin main
+git merge dev --no-edit
 git push origin main
-log "GitHub 푸시 완료"
+log "main 배포 완료"
+
+# dev 브랜치로 복귀
+git checkout dev
+log "dev 브랜치 복귀"
 
 log "====== 완료 ======"

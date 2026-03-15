@@ -15,30 +15,46 @@ concurrency:
   group: 'pages'
   cancel-in-progress: false
 
+env:
+  # Actions 런너를 Node.js 24로 강제 (Node.js 20 deprecated 경고 해소)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: yarn
+
       - id: configurepages
         uses: actions/configure-pages@v5
+
       - name: Restore cache
         uses: actions/cache@v4
         with:
-          path: .next/cache
+          path: |
+            .next/cache
+            .contentlayer
           key: ${{ runner.os }}-nextjs-${{ hashFiles('**/yarn.lock') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('**/yarn.lock') }}-
-      - run: yarn
-      - run: yarn build
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build
+        run: yarn build
         env:
           EXPORT: 1
           UNOPTIMIZED: 1
           BASE_PATH: ${{ steps.configurepages.outputs.base_path }}
+          # contentlayer2 TypeError 방지: 비동기 에러를 올바르게 처리
+          NODE_OPTIONS: '--max-old-space-size=4096'
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./out

@@ -1,10 +1,12 @@
-import projectsData from '@/data/projectsData'
 import Card from '@/components/Card'
 import { genPageMetadata } from 'app/seo'
+import { getGithubProjects } from '../../lib/github'
 
 export const metadata = genPageMetadata({ title: 'Projects' })
 
-export default function Projects() {
+export default async function Projects() {
+  const projects = await getGithubProjects()
+
   return (
     <>
       <div className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -16,19 +18,20 @@ export default function Projects() {
             Projects
           </h1>
           <p className="max-w-2xl text-lg leading-8 text-stone-600 dark:text-stone-300">
-            GitHub에 공개한 저장소 중 현재 방향성과 연결되는 작업을 골라 정리합니다. 자동화, 데이터
-            수집, 퀀트 시스템, 백엔드 학습 흐름이 보이도록 구성했습니다.
+            GitHub에 공개한 저장소 전체를 불러와 정리합니다. 자동화, 데이터 수집, 퀀트 시스템,
+            백엔드 학습 흐름이 태그와 함께 드러나도록 구성했습니다.
           </p>
         </div>
         <div className="container py-12">
           <div className="-m-4 flex flex-wrap">
-            {projectsData.map((d) => (
+            {projects.map((project) => (
               <Card
-                key={d.title}
-                title={d.title}
-                description={d.description}
-                imgSrc={d.imgSrc}
-                href={d.href}
+                key={project.title}
+                title={project.title}
+                description={project.description}
+                imgSrc={project.imgSrc}
+                href={project.href}
+                tags={project.tags}
               />
             ))}
           </div>

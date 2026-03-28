@@ -1,7 +1,15 @@
 import Image from './Image'
 import Link from './Link'
 
-const Card = ({ title, description, imgSrc, href }) => (
+type CardProps = {
+  title: string
+  description: string
+  imgSrc?: string
+  href?: string
+  tags?: string[]
+}
+
+const Card = ({ title, description, imgSrc, href, tags = [] }: CardProps) => (
   <div className="md max-w-[544px] p-4 md:w-1/2">
     <div
       className={`${
@@ -41,6 +49,18 @@ const Card = ({ title, description, imgSrc, href }) => (
             title
           )}
         </h2>
+        {tags.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {tags.map((tag) => (
+              <span
+                key={`${title}-${tag}`}
+                className="text-primary-700 dark:text-primary-300 inline-flex rounded-full border border-amber-900/10 bg-amber-50 px-2.5 py-1 text-[10px] font-medium tracking-[0.16em] uppercase dark:border-stone-100/8 dark:bg-stone-900/55"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
         <p className="prose mb-4 max-w-none text-stone-600 dark:text-stone-300">{description}</p>
         {href && (
           <Link

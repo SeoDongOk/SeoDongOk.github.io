@@ -3,9 +3,9 @@ const siteMetadata = {
   title: 'D.Ok Seo Blog',
   author: 'DongOk Seo(Albert)',
   headerTitle: 'D.Ok Seo Blog',
-  description: 'A blog created with Next.js and Tailwind.css',
+  description: '퀀트 트레이딩 시스템, 자동매매 실험, 구현 기록을 차분하게 정리하는 개발 블로그',
   language: 'ko-kr',
-  theme: 'system', // system, dark or light
+  theme: 'light', // dark or light
   siteUrl: 'https://tailwind-nextjs-starter-blog.vercel.app',
   siteRepo: 'https://github.com/timlrx/tailwind-nextjs-starter-blog',
   siteLogo: `${process.env.BASE_PATH || ''}/static/images/logo.png`,

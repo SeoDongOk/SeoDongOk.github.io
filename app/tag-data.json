@@ -1,1 +1,11 @@
-{}
+{
+  "quantitative-trading": 16,
+  "python": 16,
+  "binance": 16,
+  "algorithm": 16,
+  "strategy": 1,
+  "daily-log": 12,
+  "backtesting": 4,
+  "futures": 2,
+  "supabase": 2
+}

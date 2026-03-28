@@ -8,34 +8,33 @@
 @theme {
   /* Font families */
   --font-sans:
-    var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
-    'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'URW Palladio L', 'Baskerville',
+    'Times New Roman', serif;
 
   /* Colors */
-  /* Copied from https://tailwindcss.com/docs/theme#default-theme-variable-reference */
-  --color-primary-50: oklch(0.971 0.014 343.198);
-  --color-primary-100: oklch(0.948 0.028 342.258);
-  --color-primary-200: oklch(0.899 0.061 343.231);
-  --color-primary-300: oklch(0.823 0.12 346.018);
-  --color-primary-400: oklch(0.718 0.202 349.761);
-  --color-primary-500: oklch(0.656 0.241 354.308);
-  --color-primary-600: oklch(0.592 0.249 0.584);
-  --color-primary-700: oklch(0.525 0.223 3.958);
-  --color-primary-800: oklch(0.459 0.187 3.815);
-  --color-primary-900: oklch(0.408 0.153 2.432);
-  --color-primary-950: oklch(0.284 0.109 3.907);
+  --color-primary-50: oklch(0.982 0.012 82.4);
+  --color-primary-100: oklch(0.955 0.021 80.9);
+  --color-primary-200: oklch(0.907 0.039 79.7);
+  --color-primary-300: oklch(0.835 0.063 77.5);
+  --color-primary-400: oklch(0.737 0.087 72.3);
+  --color-primary-500: oklch(0.637 0.092 63.8);
+  --color-primary-600: oklch(0.549 0.083 59.1);
+  --color-primary-700: oklch(0.452 0.071 53.4);
+  --color-primary-800: oklch(0.368 0.056 49.1);
+  --color-primary-900: oklch(0.289 0.044 43.7);
+  --color-primary-950: oklch(0.216 0.031 39.8);
 
-  --color-gray-50: oklch(0.985 0.002 247.839);
-  --color-gray-100: oklch(0.967 0.003 264.542);
-  --color-gray-200: oklch(0.928 0.006 264.531);
-  --color-gray-300: oklch(0.872 0.01 258.338);
-  --color-gray-400: oklch(0.707 0.022 261.325);
-  --color-gray-500: oklch(0.551 0.027 264.364);
-  --color-gray-600: oklch(0.446 0.03 256.802);
-  --color-gray-700: oklch(0.373 0.034 259.733);
-  --color-gray-800: oklch(0.278 0.033 256.848);
-  --color-gray-900: oklch(0.21 0.034 264.665);
-  --color-gray-950: oklch(0.13 0.028 261.692);
+  --color-gray-50: oklch(0.983 0.008 85.6);
+  --color-gray-100: oklch(0.961 0.01 83.1);
+  --color-gray-200: oklch(0.914 0.012 78.2);
+  --color-gray-300: oklch(0.834 0.016 71.4);
+  --color-gray-400: oklch(0.691 0.019 63.2);
+  --color-gray-500: oklch(0.552 0.021 57.1);
+  --color-gray-600: oklch(0.444 0.019 48.7);
+  --color-gray-700: oklch(0.359 0.018 44.3);
+  --color-gray-800: oklch(0.276 0.015 39.7);
+  --color-gray-900: oklch(0.212 0.013 35.5);
+  --color-gray-950: oklch(0.165 0.01 31.8);
 
   /* Line heights */
   --line-height-11: 2.75rem;
@@ -58,6 +57,50 @@
   color utility to any element that depends on these defaults.
 */
 @layer base {
+  html {
+    background:
+      radial-gradient(circle at top, rgb(231 217 193 / 0.32), transparent 32%),
+      linear-gradient(180deg, #f7f1e6 0%, #efe4d1 52%, #e5d5bc 100%);
+  }
+
+  html.dark {
+    background:
+      radial-gradient(1200px 420px at 50% -4%, rgb(241 197 124 / 0.22), transparent 42%),
+      radial-gradient(700px 220px at 50% 0%, rgb(255 227 179 / 0.1), transparent 34%),
+      linear-gradient(180deg, #231913 0%, #1c140f 22%, #16100d 54%, #120d0a 100%);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background:
+      linear-gradient(rgb(255 255 255 / 0.42), rgb(255 255 255 / 0.14)),
+      repeating-linear-gradient(
+        90deg,
+        rgb(123 86 52 / 0.03) 0,
+        rgb(123 86 52 / 0.03) 1px,
+        transparent 1px,
+        transparent 24px
+      );
+  }
+
+  html.dark body {
+    background:
+      linear-gradient(
+        180deg,
+        rgb(255 231 196 / 0.035) 0%,
+        rgb(33 24 18 / 0.06) 12%,
+        rgb(20 15 12 / 0.26) 36%,
+        rgb(18 14 11 / 0.36) 100%
+      ),
+      repeating-linear-gradient(
+        90deg,
+        rgb(245 222 179 / 0.025) 0,
+        rgb(245 222 179 / 0.025) 1px,
+        transparent 1px,
+        transparent 24px
+      );
+  }
+
   *,
   ::after,
   ::before,
@@ -77,10 +120,15 @@
     border-radius: var(--radius-sm);
     outline-color: var(--color-primary-500);
   }
+
+  ::selection {
+    background: rgb(147 98 47 / 0.2);
+  }
 }
 
 @layer utilities {
   .prose {
+    color: var(--color-gray-700);
     & a {
       color: var(--color-primary-500);
       &:hover {
@@ -93,12 +141,14 @@
     & :where(h1, h2) {
       font-weight: 700;
       letter-spacing: var(--tracking-tight);
+      color: var(--color-gray-900);
     }
     & h3 {
       font-weight: 600;
+      color: var(--color-gray-800);
     }
     & :where(code):not(pre code) {
-      color: var(--color-indigo-500);
+      color: var(--color-primary-700);
     }
   }
 
@@ -112,9 +162,22 @@
         color: var(--color-primary-400);
       }
     }
+    & {
+      color: var(--color-gray-300);
+    }
     & :where(h1, h2, h3, h4, h5, h6) {
       color: var(--color-gray-100);
     }
+  }
+}
+
+@layer components {
+  .ambient-panel {
+    @apply border border-stone-900/10 bg-[#f7f0e4]/90 shadow-[0_20px_60px_rgba(76,52,32,0.1)] dark:border-stone-100/8 dark:bg-[linear-gradient(180deg,rgba(43,31,24,0.82),rgba(24,18,14,0.9))] dark:shadow-[0_18px_44px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,240,214,0.04)];
+  }
+
+  .ambient-surface {
+    @apply border border-stone-900/10 bg-white/60 dark:border-stone-100/8 dark:bg-[linear-gradient(180deg,rgba(50,38,29,0.58),rgba(27,20,16,0.72))] dark:shadow-[0_10px_24px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,236,204,0.03)];
   }
 }
 

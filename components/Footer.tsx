@@ -11,7 +11,7 @@ export default function Footer() {
             Field Notes
           </p>
           <p className="mt-3 text-sm leading-7 text-stone-600 dark:text-stone-300">
-            시스템을 만들고, 실험을 기록하고, 결과를 천천히 축적하는 개발 아카이브.
+            나의 소개, 관심 분야, 그리고 프로젝트를 정리한 포트폴리오입니다.
           </p>
         </div>
         <div className="flex flex-col items-center">
@@ -28,7 +28,7 @@ export default function Footer() {
             <Link href="/">{siteMetadata.title}</Link>
           </div>
           <div className="text-xs tracking-[0.24em] text-stone-500 uppercase dark:text-stone-400">
-            Quant, systems, and deliberate notes
+            Portfolio, interests, and projects
           </div>
         </div>
       </div>

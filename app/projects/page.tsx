@@ -18,8 +18,8 @@ export default async function Projects() {
             Projects
           </h1>
           <p className="max-w-2xl text-lg leading-8 text-stone-600 dark:text-stone-300">
-            GitHub에 공개한 저장소 전체를 불러와 정리합니다. 자동화, 데이터 수집, 퀀트 시스템,
-            백엔드 학습 흐름이 태그와 함께 드러나도록 구성했습니다.
+            GitHub에 공개한 저장소를 기준으로 진행했던 작업과 현재 방향을 정리했습니다. 프로젝트별
+            기술 스택과 관심 분야가 함께 보이도록 구성했습니다.
           </p>
         </div>
         <div className="container py-12">

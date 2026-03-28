@@ -1,5 +1,6 @@
 import Link from '@/components/Link'
 import Tag from '@/components/Tag'
+import HeroLanguageSwitch from '@/components/HeroLanguageSwitch'
 import siteMetadata from '@/data/siteMetadata'
 import { formatDate } from 'pliny/utils/formatDate'
 
@@ -17,25 +18,21 @@ export default function Home({ posts }) {
               <p className="text-xs tracking-[0.34em] text-stone-500 uppercase dark:text-stone-400">
                 D.Ok Seo Archive
               </p>
-              <h1 className="mt-4 max-w-3xl text-4xl leading-tight font-bold tracking-tight text-stone-900 md:text-6xl dark:text-stone-100">
-                우디하고 차분한 톤으로 정리하는 퀀트 개발 기록.
-              </h1>
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-stone-600 dark:text-stone-300">
-                자동매매 시스템, 백테스트, 실험 로그, 그리고 구현 과정에서 마주친 문제를 천천히
-                축적하는 기술 아카이브입니다.
-              </p>
+              <div className="mt-4">
+                <HeroLanguageSwitch />
+              </div>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
                   href="/blog"
                   className="border-primary-700 bg-primary-700 hover:bg-primary-800 rounded-full border px-5 py-2.5 text-sm tracking-[0.16em] text-white uppercase transition"
                 >
-                  Read Journal
+                  글 보러가기
                 </Link>
                 <Link
                   href="/projects"
                   className="hover:border-primary-500 hover:text-primary-700 rounded-full border border-stone-800/15 bg-white/70 px-5 py-2.5 text-sm tracking-[0.16em] text-stone-700 uppercase transition dark:border-stone-100/10 dark:bg-stone-900/40 dark:text-stone-200"
                 >
-                  View Projects
+                  프로젝트 보기
                 </Link>
               </div>
             </div>
@@ -61,10 +58,10 @@ export default function Home({ posts }) {
               </div>
               <div className="ambient-surface rounded-[1.5rem] p-5">
                 <p className="text-xs tracking-[0.26em] text-stone-500 uppercase dark:text-stone-400">
-                  Tone
+                  Notes
                 </p>
                 <p className="mt-3 text-sm leading-7 text-stone-600 dark:text-stone-300">
-                  빠르게 소비되는 피드보다, 오래 남는 작업 노트에 가깝게 구성합니다.
+                  관심 있는 주제와 진행 중인 작업을 계속 업데이트합니다.
                 </p>
               </div>
             </div>
@@ -80,7 +77,7 @@ export default function Home({ posts }) {
               최신 기록
             </h2>
             <p className="max-w-2xl text-base leading-7 text-stone-600 dark:text-stone-300">
-              {siteMetadata.description}
+              최근에 업데이트한 글과 작업 기록입니다.
             </p>
           </div>
         </div>
@@ -126,7 +123,7 @@ export default function Home({ posts }) {
                           className="text-primary-600 hover:text-primary-700 dark:hover:text-primary-400"
                           aria-label={`Read more: "${title}"`}
                         >
-                          Continue reading &rarr;
+                          더 읽기 &rarr;
                         </Link>
                       </div>
                     </div>
@@ -145,7 +142,7 @@ export default function Home({ posts }) {
             className="text-primary-600 hover:text-primary-700 dark:hover:text-primary-400"
             aria-label="All posts"
           >
-            All Notes &rarr;
+            전체 글 보기 &rarr;
           </Link>
         </div>
       )}

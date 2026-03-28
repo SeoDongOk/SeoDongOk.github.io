@@ -3,7 +3,7 @@ const siteMetadata = {
   title: 'D.Ok Seo Blog',
   author: 'DongOk Seo(Albert)',
   headerTitle: 'D.Ok Seo Blog',
-  description: '퀀트 트레이딩 시스템, 자동매매 실험, 구현 기록을 차분하게 정리하는 개발 블로그',
+  description: 'DongOk Seo의 관심사와 진행 중인 프로젝트를 정리한 포트폴리오',
   language: 'ko-kr',
   theme: 'light', // dark or light
   siteUrl: 'https://tailwind-nextjs-starter-blog.vercel.app',

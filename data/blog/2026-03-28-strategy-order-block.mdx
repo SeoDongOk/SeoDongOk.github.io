@@ -1,0 +1,204 @@
+---
+title: '[전략] Order Block — 기관의 발자국을 따라가는 스마트머니 전략'
+date: '2026-03-28'
+tags:
+  [
+    'quantitative-trading',
+    'python',
+    'binance',
+    'strategy',
+    'order-block',
+    'smart-money',
+    'technical-analysis',
+  ]
+draft: false
+summary: '스마트머니(기관) 개념에서 파생된 오더블록 전략. 강한 가격 이동 직전 마지막 역방향 봉을 오더블록으로 식별하고, 가격이 재방문할 때 진입한다. 15m 단타에서 -43%를 기록했지만, 파라미터 조정과 타임프레임 변경으로 개선 가능성이 있다.'
+---
+
+> 퀀트 개발자를 향한 여정. 매일 한 줄씩.
+
+## 전략 개요
+
+**Order Block(오더블록)** 은 ICT(Inner Circle Trader) 방법론에서 나온 개념으로,
+**스마트머니(기관, 대형 트레이더)** 가 대량 주문을 집행한 가격대를 찾아서
+동일 방향으로 따라가는 전략이다.
+
+기관은 대량 매수/매도 시 시장에 충격(slippage)을 주지 않기 위해
+여러 차례에 나눠 주문을 넣는다. 그 결과 특정 가격 구간에 미체결 잔량이 쌓이고,
+가격이 그 구간으로 돌아왔을 때 다시 강한 움직임이 발생한다.
+
+---
+
+## 오더블록의 정의
+
+### Bullish Order Block (지지 오더블록)
+
+```
+강한 상승 직전 마지막 음봉(하락봉) 구간
+
+  [음봉] ← 이게 Bullish OB
+     ↓
+  [강한 상승 시작]  ← impulse move
+     ↑
+     ↑
+     ↑
+```
+
+기관이 이 음봉 구간에서 매수 주문을 쌓아뒀다는 해석.
+가격이 다시 이 구간으로 내려오면 → LONG 진입.
+
+### Bearish Order Block (저항 오더블록)
+
+```
+강한 하락 직전 마지막 양봉(상승봉) 구간
+
+     ↓
+     ↓
+     ↓
+  [강한 하락 시작]
+     ↑
+  [양봉] ← 이게 Bearish OB
+```
+
+가격이 다시 이 구간으로 올라오면 → SHORT 진입.
+
+---
+
+## 핵심 개념: Mitigation (소멸)
+
+한 번 사용된 오더블록은 **소멸(Mitigated)** 된다.
+
+```python
+# Bullish OB 소멸 조건: 가격이 OB 하단 아래로 내려간 경우
+if subsequent["low"] < ob_low:
+    block.mitigated = True
+
+# Bearish OB 소멸 조건: 가격이 OB 상단 위로 올라간 경우
+if subsequent["high"] > ob_high:
+    block.mitigated = True
+```
+
+소멸된 OB는 더 이상 유효하지 않다. 미결(미소멸) OB만 사용.
+
+---
+
+## 진입 로직
+
+```python
+# 1. 오더블록 탐색 (최근 ob_max_age 봉 내)
+for i in range(start, end):
+    # 강한 상승 직전 음봉 → Bullish OB
+    if is_bearish_candle and up_move_pct >= ob_min_move_pct:
+        blocks.append(OrderBlock(bullish))
+
+    # 강한 하락 직전 양봉 → Bearish OB
+    if is_bullish_candle and dn_move_pct >= ob_min_move_pct:
+        blocks.append(OrderBlock(bearish))
+
+# 2. 소멸된 OB 제거
+valid_blocks = [b for b in blocks if not b.mitigated]
+
+# 3. 현재가가 유효 OB 범위 내 진입 시 신호
+for block in valid_blocks:
+    if ob_low * (1-buf) <= price <= ob_high * (1+buf):
+        → BUY / SELL 신호
+```
+
+---
+
+## 신호 강도 계산
+
+```python
+# Bullish OB: OB 상단에 가까울수록 강함 (더 깊이 진입)
+depth = (ob_high - price) / ob_size
+strength = min(max(depth, 0.0), 1.0)
+
+# Bearish OB: OB 하단에 가까울수록 강함
+depth = (price - ob_low) / ob_size
+```
+
+---
+
+## 파라미터 설명
+
+| 파라미터          | 기본값 | 설명                                                 |
+| ----------------- | ------ | ---------------------------------------------------- |
+| `ob_min_move_pct` | 1.5%   | 강한 이동 최소 기준. 높일수록 OB 수 감소/신뢰도 증가 |
+| `impulse_candles` | 3      | 이동 확인 봉 수. 많을수록 더 큰 이동 필요            |
+| `ob_max_age`      | 50     | OB 유효 기간(봉). 작을수록 최신 OB만 사용            |
+| `ob_entry_buffer` | 0.1%   | 진입 허용 버퍼. 소폭 초과 진입 허용                  |
+
+### 파라미터 조정 가이드
+
+```python
+# 현재 설정 (15m 기준, 진입 많음)
+ob_min_move_pct=1.5, ob_max_age=50
+
+# 더 엄격한 설정 (1h 기준 권장)
+ob_min_move_pct=3.0, ob_max_age=30
+
+# 매우 엄격 (일봉 기준)
+ob_min_move_pct=5.0, ob_max_age=20
+```
+
+---
+
+## 백테스트 결과
+
+### SOLUSDT 15m, 30x 레버리지
+
+| 기간  | 수익률      | 거래수 | 승률  | MDD   | Sharpe |
+| ----- | ----------- | ------ | ----- | ----- | ------ |
+| 90일  | **-74.21%** | 66건   | 22.7% | 83.2% | -0.138 |
+| 365일 | **-43.37%** | 248건  | 28.6% | 80.2% | 0.001  |
+
+### 왜 15m에서 부진했나?
+
+오더블록 전략이 15m 단타에서 어려운 이유:
+
+1. **OB 크기가 너무 작음**: 15m 봉의 고저 범위가 좁아서 OB가 빈번하게 생성되고,
+   진입 후 버퍼 없이 SL에 도달하는 경우가 많음
+
+2. **이중 OB 겹침**: 짧은 타임프레임에서는 여러 OB가 중첩되어
+   어느 레벨이 진짜 기관 오더인지 구분하기 어려움
+
+3. **잦은 재진입**: `ob_entry_buffer=0.1%`로 설정하면 가격이 OB 근방에서
+   진입→SL→재진입→SL 패턴이 반복될 수 있음
+
+### 개선 방향
+
+```python
+# 1. 타임프레임 상향 (1h 이상)
+# 2. ob_min_move_pct 상향 (3.0%)
+# 3. OB 진입 후 확인 캔들 1개 추가 (다음 봉 양봉 시에만 진입)
+# 4. ob_max_age 축소 (최신 OB만)
+```
+
+---
+
+## 스마트머니 개념의 의의
+
+오더블록은 **지지/저항을 '선'이 아닌 '구간'으로 보는** 진화된 접근법이다.
+
+기존 기술적 분석:
+
+- 특정 가격(수평선)에서 지지/저항 발생
+
+스마트머니 개념:
+
+- 기관이 주문을 집행한 **봉 전체 범위**가 지지/저항 구간
+- 이 구간에 재진입 시 기관의 미체결 잔량이 받쳐줌
+
+이론적으로는 강력하지만, **실제 기관의 오더를 15분봉으로 특정하는 것은 노이즈가 많다.**
+일봉이나 4시간봉에서 식별한 오더블록이 훨씬 신뢰도가 높다.
+
+---
+
+## 코드 위치
+
+```
+strategies/order_block_strategy.py
+```
+
+다음 버전에서는 **확인 캔들(confirmation candle)** 조건을 추가하고,
+1h 타임프레임으로 재테스트할 예정이다.

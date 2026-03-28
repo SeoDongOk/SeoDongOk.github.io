@@ -1,0 +1,187 @@
+---
+title: '[전략 분석] 새로 추가한 4가지 매매 전략 — EMA Alignment, MACD, Ichimoku, Order Block'
+date: '2026-03-28'
+tags: ['quantitative-trading', 'python', 'binance', 'algorithm', 'strategy', 'technical-analysis']
+draft: false
+summary: 'sdo_auto_trader_crypto에 새롭게 추가한 4가지 전략의 로직과 원리를 정리합니다. EMA 정배열 전환, MACD 크로스, 이치모쿠 구름, 오더블록(스마트머니) 전략.'
+---
+
+> 퀀트 개발자를 향한 여정. 매일 한 줄씩.
+
+오늘은 기존 12개 전략에 더해 새롭게 구현한 4가지 전략의 원리와 코드 설계를 정리한다.
+기술적 분석의 대표 로직들이고, 각각 다른 시장 국면에서 강점을 가진다.
+
+---
+
+## 1. EMA Alignment — 정배열/역배열 전환 전략
+
+### 핵심 아이디어
+
+추세의 시작은 **EMA 배열이 바뀌는 순간**이다.
+
+- **역배열**: EMA fast < EMA mid < EMA slow (하락 추세)
+- **정배열**: EMA fast > EMA mid > EMA slow (상승 추세)
+
+역배열 → 정배열로 바뀌는 첫 캔들에서 LONG 진입, 반대면 SHORT 진입.
+
+### 진입 조건
+
+```python
+# LONG: 역배열 → 정배열 전환
+bullish_align = ef > em > es       # 현재 봉: 정배열
+prev_bearish  = ef_prev < es_prev  # 직전 봉: 역배열
+vol_ok        = vol >= vol_ma * 1.2  # 거래량 확인
+```
+
+### 파라미터
+
+| 파라미터      | 기본값 | 설명             |
+| ------------- | ------ | ---------------- |
+| `ema_fast`    | 8      | 단기 EMA         |
+| `ema_mid`     | 21     | 중기 EMA         |
+| `ema_slow`    | 50     | 장기 EMA         |
+| `volume_mult` | 1.2    | 거래량 필터 배수 |
+
+### 특징
+
+- 거래 빈도가 낮고(90일 26건) 진입 타이밍이 명확해 **MDD 관리에 유리**
+- 거래량 필터로 가짜 전환(whipsaw) 차단
+- 15m ~ 1h 타임프레임 적합
+
+---
+
+## 2. MACD — 모멘텀 크로스 전략
+
+### 핵심 아이디어
+
+MACD(Moving Average Convergence Divergence)는 **모멘텀의 전환점**을 포착한다.
+
+- MACD 라인 = EMA(12) - EMA(26)
+- 시그널 라인 = MACD의 EMA(9)
+- 히스토그램 = MACD - 시그널
+
+### 진입 조건
+
+```python
+# LONG: 골든크로스 + 히스토그램 양전환
+cross_up     = macd_prev <= sig_prev and macd_cur > sig_cur
+hist_turn_up = hist_prev < 0 and hist_cur > 0
+```
+
+### 파라미터
+
+| 파라미터       | 기본값 | 설명                    |
+| -------------- | ------ | ----------------------- |
+| `fast`         | 12     | 단기 EMA                |
+| `slow`         | 26     | 장기 EMA                |
+| `signal`       | 9      | 시그널 EMA              |
+| `zero_filter`  | False  | 제로선 위 크로스만 허용 |
+| `hist_confirm` | True   | 히스토그램 전환 필수    |
+
+### 특징
+
+- 거래 빈도 높음 (365일 1749건)
+- `zero_filter=True`로 설정하면 강한 추세에서만 진입 → MDD 개선 가능
+- 승률이 30%대여도 손익비 덕분에 수익 가능한 구조
+
+---
+
+## 3. Ichimoku — 이치모쿠 구름 전략
+
+### 핵심 아이디어
+
+이치모쿠는 **5개 선**으로 추세, 지지/저항, 모멘텀을 한 번에 파악한다.
+
+```
+전환선(Tenkan)  = (9봉 고가 + 9봉 저가) / 2
+기준선(Kijun)   = (26봉 고가 + 26봉 저가) / 2
+선행스팬A        = (전환선 + 기준선) / 2  → 26봉 앞
+선행스팬B        = (52봉 고가 + 52봉 저가) / 2  → 26봉 앞
+후행스팬(Chikou) = 현재 종가 → 26봉 뒤
+```
+
+### 진입 조건 (strict=False 기준)
+
+```python
+# LONG
+전환선 > 기준선     # 단기 상승 모멘텀
+현재가 > 구름 상단  # 구름 위에서 매수만
+```
+
+### 파라미터
+
+| 파라미터   | 기본값 | 설명                            |
+| ---------- | ------ | ------------------------------- |
+| `tenkan`   | 9      | 전환선 기간                     |
+| `kijun`    | 26     | 기준선 기간                     |
+| `senkou_b` | 52     | 선행스팬B 기간                  |
+| `strict`   | True   | True: 후행스팬+구름색 추가 확인 |
+
+### 특징
+
+- 1h 이상 타임프레임에서 강점 발휘 (15m에선 노이즈 많음)
+- strict=False로 15m에서도 365일 +398.95% 달성 (단, MDD 72.6%)
+- 구름 두께가 지지/저항 강도를 나타냄
+
+---
+
+## 4. Order Block — 스마트머니(오더블록) 전략
+
+### 핵심 아이디어
+
+**기관(스마트머니)이 대량 주문을 넣은 가격대**를 가격이 다시 방문할 때 동일 방향으로 진입.
+
+```
+Bullish OB: 강한 상승 직전 마지막 음봉 구간 → 지지
+Bearish OB: 강한 하락 직전 마지막 양봉 구간 → 저항
+```
+
+### 오더블록 식별
+
+```python
+# Bullish OB: 음봉 + 이후 N봉 동안 ob_min_move_pct% 이상 상승
+is_bearish_candle and up_move_pct >= ob_min_move_pct
+
+# Mitigation(소멸): 가격이 OB 하단 아래로 내려가면 무효
+if subsequent["low"] < ob_low: block.mitigated = True
+```
+
+### 파라미터
+
+| 파라미터          | 기본값 | 설명                |
+| ----------------- | ------ | ------------------- |
+| `ob_min_move_pct` | 1.5%   | 강한 이동 최소 기준 |
+| `impulse_candles` | 3      | 이동 확인 봉 수     |
+| `ob_max_age`      | 50     | OB 유효 기간(봉 수) |
+| `ob_entry_buffer` | 0.1%   | 진입 허용 버퍼      |
+
+### 특징
+
+- 이론적으로 강력하지만 **15m 단타에서는 너무 잦은 재진입**으로 손실 누적
+- 1h 이상 + `ob_min_move_pct` 상향(3.0% 이상) 조정 시 성능 개선 예상
+- 스마트머니 개념의 핵심으로, 파라미터 최적화 가치 있음
+
+---
+
+## 코드 추가 위치
+
+```
+strategies/
+├── ema_alignment_strategy.py   ← 신규
+├── macd_strategy.py            ← 신규
+├── ichimoku_strategy.py        ← 신규
+└── order_block_strategy.py     ← 신규
+```
+
+`strategies/__init__.py`의 `STRATEGY_MAP`에 등록:
+
+```python
+"ema_alignment": EMAAlignmentStrategy,
+"macd":          MACDStrategy,
+"ichimoku":      IchimokuStrategy,
+"order_block":   OrderBlockStrategy,
+```
+
+---
+
+내일은 MACD와 이치모쿠의 파라미터를 조정해서 MDD를 낮추는 최적화를 진행할 예정이다.

@@ -1,0 +1,104 @@
+'use client'
+
+import { useLanguage } from './LanguageContext'
+
+export const uiCopy = {
+  ko: {
+    common: {
+      portfolio: 'Portfolio',
+      posts: 'Posts',
+      tags: 'Tags',
+      publishedOn: '게시일',
+      previous: '이전',
+      next: '다음',
+      of: '/',
+      allPosts: '전체 글',
+      searchArticles: '글 검색',
+      noPostsFound: '작성된 글이 없습니다.',
+      viewPostsTagged: '태그된 글 보기',
+      repository: 'Repository',
+      viewRepository: '저장소 보기',
+      about: 'About',
+      projects: 'Projects',
+      repositoryIndex: 'Repository Index',
+      projectIntro:
+        'GitHub에 공개한 저장소를 기준으로 작업 내용을 정리했습니다. 각 카드에서 사용한 기술과 관심 분야를 함께 볼 수 있습니다.',
+      noTagsFound: '태그가 없습니다.',
+      previousArticle: '이전 글',
+      nextArticle: '다음 글',
+      backToBlog: '블로그로 돌아가기',
+      discussOnTwitter: '트위터에서 보기',
+      viewOnGithub: 'GitHub에서 보기',
+      notFoundTitle: '페이지를 찾을 수 없습니다.',
+      notFoundDescription: '원하는 페이지가 없으면 홈에서 다른 내용을 확인할 수 있습니다.',
+      backToHomepage: '홈으로 돌아가기',
+    },
+  },
+  ja: {
+    common: {
+      portfolio: 'Portfolio',
+      posts: 'Posts',
+      tags: 'Tags',
+      publishedOn: '公開日',
+      previous: '前へ',
+      next: '次へ',
+      of: '/',
+      allPosts: 'すべての記事',
+      searchArticles: '記事を検索',
+      noPostsFound: 'まだ投稿がありません。',
+      viewPostsTagged: 'タグ付きの記事を見る',
+      repository: 'Repository',
+      viewRepository: 'リポジトリを見る',
+      about: 'About',
+      projects: 'Projects',
+      repositoryIndex: 'Repository Index',
+      projectIntro:
+        'GitHub に公開しているリポジトリをもとに作業内容をまとめています。各カードで使用技術と関心分野をあわせて確認できます。',
+      noTagsFound: 'タグがありません。',
+      previousArticle: '前の記事',
+      nextArticle: '次の記事',
+      backToBlog: 'ブログに戻る',
+      discussOnTwitter: 'Twitter で見る',
+      viewOnGithub: 'GitHub で見る',
+      notFoundTitle: 'ページが見つかりません。',
+      notFoundDescription: '目的のページがなくても、ホームでほかの内容を確認できます。',
+      backToHomepage: 'ホームへ戻る',
+    },
+  },
+  en: {
+    common: {
+      portfolio: 'Portfolio',
+      posts: 'Posts',
+      tags: 'Tags',
+      publishedOn: 'Published on',
+      previous: 'Previous',
+      next: 'Next',
+      of: 'of',
+      allPosts: 'All Posts',
+      searchArticles: 'Search articles',
+      noPostsFound: 'No posts found.',
+      viewPostsTagged: 'View posts tagged',
+      repository: 'Repository',
+      viewRepository: 'View Repository',
+      about: 'About',
+      projects: 'Projects',
+      repositoryIndex: 'Repository Index',
+      projectIntro:
+        'This page organizes work based on public GitHub repositories, with each card showing the stack and area of interest behind it.',
+      noTagsFound: 'No tags found.',
+      previousArticle: 'Previous Article',
+      nextArticle: 'Next Article',
+      backToBlog: 'Back to the blog',
+      discussOnTwitter: 'Discuss on Twitter',
+      viewOnGithub: 'View on GitHub',
+      notFoundTitle: "Sorry we couldn't find this page.",
+      notFoundDescription: 'You can still find plenty of other things on the homepage.',
+      backToHomepage: 'Back to homepage',
+    },
+  },
+} as const
+
+export function useUiCopy() {
+  const { language } = useLanguage()
+  return uiCopy[language]
+}

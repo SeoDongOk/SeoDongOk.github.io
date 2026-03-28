@@ -2,6 +2,7 @@
 
 import { ThemeProvider } from 'next-themes'
 import siteMetadata from '@/data/siteMetadata'
+import { LanguageProvider } from '@/components/LanguageContext'
 
 export function ThemeProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -11,7 +12,7 @@ export function ThemeProviders({ children }: { children: React.ReactNode }) {
       enableSystem={false}
       disableTransitionOnChange
     >
-      {children}
+      <LanguageProvider>{children}</LanguageProvider>
     </ThemeProvider>
   )
 }

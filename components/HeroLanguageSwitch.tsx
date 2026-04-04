@@ -33,7 +33,7 @@ export default function HeroLanguageSwitch() {
       <h1 className="max-w-3xl text-4xl leading-tight font-bold tracking-tight text-stone-900 md:text-6xl dark:text-stone-100">
         {copy.title}
       </h1>
-      <p className="mt-6 max-w-2xl text-lg leading-8 text-stone-600 dark:text-stone-300">
+      <p className="mt-6 max-w-2xl text-lg leading-8 text-stone-600 dark:text-stone-100">
         {copy.description}
       </p>
     </div>

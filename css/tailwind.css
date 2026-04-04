@@ -152,6 +152,40 @@
     }
   }
 
+  :is(.dark *).prose {
+    color: var(--color-gray-100);
+    & :where(h1, h2) {
+      color: var(--color-gray-50);
+    }
+    & h3 {
+      color: var(--color-gray-50);
+    }
+    & :where(h4, h5, h6) {
+      color: var(--color-gray-50);
+    }
+    & :where(strong) {
+      color: var(--color-gray-50);
+    }
+    & :where(blockquote) {
+      color: var(--color-gray-200);
+    }
+    & :where(code):not(pre code) {
+      color: var(--color-primary-300);
+    }
+    & :where(th) {
+      color: var(--color-gray-50);
+    }
+    & :where(td) {
+      color: var(--color-gray-200);
+    }
+    & a {
+      color: var(--color-primary-400);
+      &:hover {
+        color: var(--color-primary-300);
+      }
+    }
+  }
+
   .prose-invert {
     & a {
       color: var(--color-primary-500);

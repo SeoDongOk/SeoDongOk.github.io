@@ -39,7 +39,7 @@ function Pagination({ totalPages, currentPage }: PaginationProps) {
       <nav className="ambient-surface flex items-center justify-between gap-4 rounded-full border border-stone-900/10 bg-white/70 px-5 py-3 text-sm tracking-[0.16em] uppercase">
         {!prevPage && (
           <button
-            className="cursor-auto text-stone-400 disabled:opacity-50 dark:text-stone-500"
+            className="cursor-auto text-stone-400 disabled:opacity-50 dark:text-stone-400"
             disabled={!prevPage}
           >
             {common.previous}
@@ -59,7 +59,7 @@ function Pagination({ totalPages, currentPage }: PaginationProps) {
         </span>
         {!nextPage && (
           <button
-            className="cursor-auto text-stone-400 disabled:opacity-50 dark:text-stone-500"
+            className="cursor-auto text-stone-400 disabled:opacity-50 dark:text-stone-400"
             disabled={!nextPage}
           >
             {common.next}

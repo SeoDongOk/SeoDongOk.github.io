@@ -168,6 +168,18 @@
     & :where(h1, h2, h3, h4, h5, h6) {
       color: var(--color-gray-50);
     }
+    & :where(code):not(pre code) {
+      color: var(--color-primary-300);
+    }
+    & :where(blockquote) {
+      color: var(--color-gray-200);
+    }
+    & :where(strong) {
+      color: var(--color-gray-50);
+    }
+    & :where(th) {
+      color: var(--color-gray-50);
+    }
   }
 }
 

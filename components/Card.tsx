@@ -43,7 +43,7 @@ const Card = ({ title, description, imgSrc, href, tags = [] }: CardProps) => {
             />
           ))}
         <div className="p-7">
-          <p className="mb-3 text-xs tracking-[0.28em] text-stone-500 uppercase dark:text-stone-400">
+          <p className="mb-3 text-xs tracking-[0.28em] text-stone-500 uppercase dark:text-stone-300">
             {common.repository}
           </p>
           <h2 className="mb-3 text-2xl leading-8 font-bold tracking-tight text-stone-800 dark:text-stone-100">
@@ -71,7 +71,7 @@ const Card = ({ title, description, imgSrc, href, tags = [] }: CardProps) => {
           {href && (
             <Link
               href={href}
-              className="text-primary-600 hover:text-primary-700 dark:hover:text-primary-400 text-base leading-6 font-medium"
+              className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 text-base leading-6 font-medium"
               aria-label={`Link to ${title}`}
             >
               {common.viewRepository} &rarr;

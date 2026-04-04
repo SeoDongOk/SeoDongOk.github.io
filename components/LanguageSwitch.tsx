@@ -26,7 +26,7 @@ const LanguageSwitch = () => {
               onClick={() => setLanguage(option.value)}
               className={`rounded-full px-3 py-2 text-xs font-medium tracking-[0.18em] uppercase transition ${
                 active
-                  ? 'bg-primary-700 text-white shadow-[0_8px_20px_rgba(92,63,33,0.26)]'
+                  ? 'dark:bg-primary-200 bg-primary-700 text-white shadow-[0_8px_20px_rgba(92,63,33,0.26)] dark:text-stone-900 dark:shadow-[0_8px_20px_rgba(0,0,0,0.35)]'
                   : 'hover:text-primary-600 dark:hover:text-primary-300 text-stone-500 dark:text-stone-300'
               }`}
             >

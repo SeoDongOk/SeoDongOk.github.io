@@ -1,0 +1,113 @@
+---
+title: '전략별 신호 생성 주기(signal_interval) 분리 — 확장 가능한 멀티 타임프레임 아키텍처'
+date: 2026-04-12
+tags: ['quantitative-trading', 'python', 'binance', 'algorithm', 'architecture']
+summary: 'SDO v2는 15분마다, RSI/볼린저는 매분 판단해야 하는 문제를 BaseStrategy에 signal_interval 속성을 추가하여 해결한 과정'
+---
+
+## 문제 상황
+
+자동매매 봇이 `FUTURES_CHECK_INTERVAL=1m`으로 매분 실행되지만, `_at_candle_boundary()`에서 설정 파일의 `TIMEFRAME=15m`을 일괄 적용하고 있었다.
+
+```python
+# 기존 코드 — 모든 전략에 동일한 15분 경계 적용
+def _at_candle_boundary(self) -> bool:
+    tf = self.settings.timeframe  # 항상 "15m"
+    now = datetime.now()
+    if tf.endswith("m"):
+        minutes = int(tf[:-1])
+        return now.minute % minutes == 0
+```
+
+**결과:**
+
+- SDO v2 (15분봉 패턴 전략) → 15분마다 판단 ✅
+- RSI, Bollinger, MA Crossover → 15분마다 판단 ❌ (매분 판단해야 함)
+
+CombinationStrategy로 여러 전략을 결합할 때, 모든 하위 전략이 15분 경계에서만 신호를 생성하는 것은 RSI 같은 빠른 반응 전략의 의미를 퇴색시킨다.
+
+## 설계 — 전략이 자기 주기를 선언하는 구조
+
+핵심 원칙: **전략 자신이 얼마나 자주 판단해야 하는지 알고 있다.**
+
+### 1단계: BaseStrategy에 signal_interval 추가
+
+```python
+class BaseStrategy(ABC):
+    def __init__(self, name: str, signal_interval: str = "1m"):
+        self.name = name
+        self.signal_interval: str = signal_interval
+```
+
+기본값 `"1m"` — 대부분의 전략은 매분 판단이 가능하다. SDO처럼 특정 타임프레임이 필요한 전략만 명시적으로 오버라이드.
+
+### 2단계: SDO v1/v2에서 타임프레임 기반 interval 설정
+
+```python
+class SDOStrategyV2(BaseStrategy):
+    def __init__(self, timeframe_minutes: int = 15, ...):
+        _interval_map = {1: "1m", 3: "3m", 5: "5m", 15: "15m", ...}
+        super().__init__(
+            "SDO Strategy V2",
+            signal_interval=_interval_map.get(timeframe_minutes, f"{timeframe_minutes}m")
+        )
+```
+
+### 3단계: CombinationStrategy — 하위 전략별 개별 경계 체크
+
+가장 중요한 변경. CombinationStrategy 자체는 `signal_interval="1m"`으로 매분 호출되되, 내부에서 각 하위 전략의 경계를 개별 체크한다.
+
+```python
+class CombinationStrategy(BaseStrategy):
+    def __init__(self, ...):
+        super().__init__("Combination Strategy", signal_interval="1m")
+        self._signal_cache: dict[str, dict[str, Signal]] = {}
+
+    @staticmethod
+    def _at_boundary(interval: str) -> bool:
+        now = datetime.now()
+        if interval.endswith("m"):
+            return now.minute % int(interval[:-1]) == 0
+        # ...
+
+    def generate_signal(self, df, symbol):
+        for sw in self._strategies:
+            interval = sw.strategy.signal_interval
+            if self._at_boundary(interval):
+                sig = sw.strategy.generate_signal(df, symbol)
+                self._signal_cache[symbol][sw.strategy.name] = sig
+            else:
+                sig = self._signal_cache.get(symbol, {}).get(sw.strategy.name)
+                if sig is None:
+                    continue
+            sub_signals.append((sw, sig))
+```
+
+**캐시 전략:** 경계가 아닌 시점에는 마지막으로 생성된 신호를 재활용. SDO v2가 15분 전에 BUY를 냈다면, 그 사이 RSI/Bollinger의 새 신호와 함께 결합 점수가 계산된다.
+
+### 4단계: FuturesTrader 파라미터화
+
+```python
+def _at_candle_boundary(self, interval: str | None = None) -> bool:
+    tf = interval or self.strategy.signal_interval
+    # ...
+```
+
+## 결과
+
+```
+SDO v2: signal_interval=15m  ← 15분마다 패턴 판단
+RSI:    signal_interval=1m   ← 매분 과매수/과매도 체크
+Boll:   signal_interval=1m   ← 매분 밴드 이탈 체크
+MA:     signal_interval=1m   ← 매분 크로스오버 체크
+Combo:  signal_interval=1m   ← 매분 호출, 내부에서 개별 체크
+```
+
+## 확장성
+
+새 전략을 추가할 때 `super().__init__("전략명", signal_interval="5m")` 한 줄이면 끝이다. 5분봉 전략, 1시간봉 전략도 같은 패턴으로 즉시 적용 가능.
+
+## 배운 점
+
+- 설정 파일의 글로벌 값에 의존하지 말고, **각 컴포넌트가 자기 행동을 선언**하는 구조가 확장에 강하다
+- CombinationStrategy의 신호 캐시는 "경계 불일치" 문제를 우아하게 해결한다 — 느린 전략의 마지막 판단과 빠른 전략의 최신 판단을 자연스럽게 결합

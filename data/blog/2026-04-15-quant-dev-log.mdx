@@ -1,0 +1,139 @@
+---
+title: '[퀀트 개발 일지] 팀 토론 → 7개 항목 전면 개선'
+date: '2026-04-15'
+tags:
+  [
+    'quantitative-trading',
+    'python',
+    'binance',
+    'algorithm',
+    'risk-management',
+    'backtesting',
+    'daily-log',
+  ]
+draft: false
+summary: '4인 팀 토론(크립토 전략가, 리스크 매니저, 퀀트 개발자, 백엔드 엔지니어)으로 도출한 P0~P2 7개 개선 항목을 tmux 멀티 에이전트로 일괄 구현'
+---
+
+> 퀀트 개발자를 향한 여정. 매일 한 줄씩.
+
+## 오늘의 핵심
+
+AI 페르소나 4명으로 **팀 토론**을 열어 프로젝트의 전략 성과를 다각도로 리뷰하고, 도출된 7개 개선 항목을 **tmux 멀티 에이전트**로 병렬 구현했다.
+
+## 팀 토론 — 참석자 & 핵심 발언
+
+| 팀원   | 역할            | 핵심 지적                                                                                  |
+| ------ | --------------- | ------------------------------------------------------------------------------------------ |
+| 신하준 | 크립토 전략가   | "오케스트라가 SDO v2 with 장식이에요. 시장 레짐 감지 없이 고정 가중치는 횡보장에서 뻘신호" |
+| 윤재호 | 리스크 매니저   | "max_daily_loss가 미실현 손실을 미반영 — 구조적 결함. CIS 30x는 승인 못 합니다"            |
+| 김도현 | 퀀트 개발자     | "측정 없이 최적화하고 있는 상태. 백테스트부터 만드세요"                                    |
+| 강민수 | 백엔드 엔지니어 | "인메모리 포지션이 크래시 시 greed_level, peak_price 복원 불가 — 실거래 전 필수 해결"      |
+
+## 구현 완료 (7/7)
+
+### P0: 백테스트 프레임워크 구축
+
+`backtest/engine.py` — 단일 심볼·단일 전략 백테스트 엔진.
+
+```python
+from backtest.engine import BacktestEngine
+
+engine = BacktestEngine(
+    strategy=my_strategy,
+    initial_balance=1000,
+    leverage=20,
+    sl_pct=20.0,
+    tp_pct=50.0,
+    fee_rate=0.0004,
+    slippage_pct=0.05,
+)
+result = engine.run(df, "BTCUSDT")
+print(result.summary())
+```
+
+**산출 지표**: Sharpe Ratio, Sortino Ratio, Max Drawdown, Calmar Ratio, Profit Factor, 승률
+
+### P0: 포지션 상태 영속화
+
+`core/trade_recorder.py` — SQLite 기반 포지션 영속화 + 거래 이력 기록.
+
+- `active_positions` 테이블: 크래시 후 greed_level, peak_price, scaling tranche까지 복원
+- `trade_history` 테이블: 전략별 승률, 평균 수익률 추적
+- `_open_position()` → DB INSERT, `_close_position()` → DB DELETE + 거래 기록
+
+### P1: 오케스트라 min_agreeing 1→3
+
+SDO v2 (weight=3.0)가 혼자 threshold=0.5를 넘기는 문제 해결.
+`combo_min_agreeing` 기본값을 3으로 올려 **최소 3개 전략 동의** 필수.
+
+### P1: 레버리지 하드캡 20x
+
+- `validate()`: 1~125 → **1~20** 하드캡
+- CIS: 30x → **15x**, SL 마진 30% → **15%** (명목가 -1% 유지)
+
+### P1: 미실현 손실 포함 일일 한도
+
+기존 `max_daily_loss_pct`는 **실현 손실만** 집계해서 한도가 무력화되는 구조적 결함이 있었다.
+
+```python
+def _can_open_new_position(self, symbol: str) -> bool:
+    # 실현 + 미실현 손실 합산
+    total_loss = self._daily_pnl + self._total_unrealized_pnl()
+    if total_loss < -max_loss:
+        return False  # 신규 진입 차단
+```
+
+### P2: 시장 레짐 감지
+
+`strategies/market_regime.py` — ADX/ATR/EMA 기반 4가지 레짐 분류.
+
+| 레짐            | 조건                     | 가중치 조절           |
+| --------------- | ------------------------ | --------------------- |
+| TRENDING_UP     | ADX > 25 & EMA20 > EMA50 | SDO/MACD/Supertrend ↑ |
+| TRENDING_DOWN   | ADX > 25 & EMA20 < EMA50 | SDO/MACD/Supertrend ↑ |
+| SIDEWAYS        | ADX ≤ 25                 | Bollinger/RSI/VWAP ↑  |
+| HIGH_VOLATILITY | ATR 상위 25%             | 전체 가중치 50% 축소  |
+
+### P2: 전략 성과 DB 기록
+
+`trade_history` 테이블에 `strategy_name`, `signal_strength`, `pnl_pct`, `holding_seconds` 등 기록.
+`get_strategy_stats()` 메서드로 전략별 승률/평균수익 즉시 조회.
+
+## 신규 파일
+
+| 파일                          | 역할                               |
+| ----------------------------- | ---------------------------------- |
+| `backtest/engine.py`          | 백테스트 엔진 (Sharpe, MDD, PF 등) |
+| `core/trade_recorder.py`      | 거래 기록 + 포지션 영속화          |
+| `strategies/market_regime.py` | 시장 레짐 감지 (ADX/ATR/EMA)       |
+
+## 수정 파일
+
+| 파일                      | 변경                                   |
+| ------------------------- | -------------------------------------- |
+| `core/futures_trader.py`  | 미실현 손실 체크, DB 연동, 포지션 복원 |
+| `core/risk_manager.py`    | 미실현 PnL 포함 한도 체크              |
+| `core/scaling_manager.py` | `get_current_tranche()` 추가           |
+| `config/settings.py`      | CIS/레버리지/min_agreeing 기본값       |
+| `.env.example`            | 변경된 기본값 반영                     |
+
+## 작업 방식 — tmux 멀티 에이전트
+
+```
+┌─────────────────┬─────────────────┐
+│  메인            │  김도현 (퀀트)   │
+│  오케스트레이터   │  분석 + 구현     │
+│  P1/P2 직접 구현 ├─────────────────┤
+│                  │  강민수 (백엔드)  │
+│                  │  설정 변경 + 검증 │
+└─────────────────┴─────────────────┘
+```
+
+3사이클 무한 피드백 루프로 메인이 P1/P2를 직접 구현하는 동안 Sub 에이전트가 분석·검증을 병렬 수행.
+
+## 회고
+
+- **팀 토론의 위력**: 4가지 관점(전략/리스크/퀀트/시스템)으로 보니 혼자서는 못 찾았을 구조적 결함(미실현 손실 미반영)을 발견
+- **tmux 멀티 에이전트**: 메인이 코드 쓰는 동안 Sub가 분석/검증하니 체감 속도 2~3배
+- **다음 과제**: 백테스트 엔진으로 SDO 4+2 패턴의 통계적 유의성 실제 검증, 오케스트라에 레짐 감지 연동

@@ -1,0 +1,82 @@
+---
+title: '[INK 개발] Supabase에서 ALTER DATABASE 권한 에러'
+date: '2026-04-08'
+tags: ['supabase', 'postgresql', 'pg_cron', 'permission', 'ink', 'troubleshooting']
+draft: false
+summary: 'pg_cron에서 Edge Function 호출 시 service_role_key를 DB 파라미터로 저장하려 했으나 ALTER DATABASE 권한이 없어 실패한 문제'
+---
+
+## 문제 상황
+
+pg_cron → Edge Function 연결을 위해 service_role_key를 DB 파라미터로 저장하는 코드를 마이그레이션에 포함했더니 에러 발생:
+
+```
+ERROR: permission denied to set parameter "app.service_role_key" (SQLSTATE 42501)
+At statement:
+alter database postgres set app.service_role_key = 'YOUR_SERVICE_ROLE_KEY_HERE'
+```
+
+## 원인 분석
+
+`ALTER DATABASE` 는 PostgreSQL superuser 권한이 필요하다.
+Supabase에서 마이그레이션을 실행하는 계정(`postgres` role)은 일반적인 superuser가 아니라
+Supabase가 제한한 권한만 갖고 있어서 database-level GUC(파라미터) 설정이 불가능하다.
+
+## 해결 방법
+
+마이그레이션에서 `ALTER DATABASE` 줄을 제거하고, `invoke_edge_function` 함수를 수정해
+키가 없을 때 graceful하게 처리하도록 변경:
+
+```sql
+create or replace function public.invoke_edge_function(function_name text)
+returns void language plpgsql security definer as $$
+declare
+  _key text;
+begin
+  -- 1순위: DB 파라미터 (Dashboard에서 superuser로 수동 설정)
+  begin
+    _key := current_setting('app.service_role_key', true);
+  exception when others then
+    _key := null;
+  end;
+
+  -- 2순위: Supabase Vault
+  if _key is null or _key = '' then
+    begin
+      select decrypted_secret into _key
+        from vault.decrypted_secrets
+        where name = 'service_role_key' limit 1;
+    exception when others then
+      _key := null;
+    end;
+  end if;
+
+  if _key is null or _key = '' then
+    raise warning '[INK] service_role_key 미설정 — 스킵: %', function_name;
+    return;
+  end if;
+
+  perform net.http_post(
+    url     := 'https://[PROJECT_REF].supabase.co/functions/v1/' || function_name,
+    headers := jsonb_build_object(
+      'Content-Type',  'application/json',
+      'Authorization', 'Bearer ' || _key
+    ),
+    body    := '{}'::jsonb
+  );
+end;
+$$;
+```
+
+`ALTER DATABASE`는 Supabase Dashboard > SQL Editor에서 직접 실행해야 한다 (superuser 세션):
+
+```sql
+alter database postgres set app.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
+```
+
+## 배운 점
+
+- Supabase 마이그레이션 실행 계정은 제한된 권한 → `ALTER DATABASE`, `ALTER SYSTEM` 불가
+- pg_cron에서 시크릿이 필요한 경우 **Supabase Vault** 사용이 가장 안전한 방법
+- 마이그레이션에 superuser 명령이 필요하면 Dashboard SQL Editor에서 별도로 실행해야 함
+- 함수 내부에서 키가 없을 때 에러 대신 `RAISE WARNING`으로 graceful 처리하는 게 운영에 유리

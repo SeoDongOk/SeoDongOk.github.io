@@ -1,0 +1,50 @@
+---
+title: '[INK 개발] macOS sed에서 \\b 단어 경계가 작동하지 않는 문제'
+date: '2026-04-08'
+tags: ['macos', 'sed', 'bash', 'regex', 'ink', 'troubleshooting']
+draft: false
+summary: 'macOS BSD sed에서 \\b 단어 경계 패턴이 지원되지 않아 변수명 치환에 실패한 문제와 perl로 해결한 방법'
+---
+
+## 문제 상황
+
+RN 앱의 색상 팔레트를 주황색에서 INK 네이비로 변경하면서, 소스 파일 전체의 `ORANGE` 변수를 `palette.primary`로 치환하려 했다.
+
+```bash
+find . \( -name "*.ts" -o -name "*.tsx" \) | xargs sed -i '' \
+  -e 's/\bORANGE\b/palette.primary/g'
+```
+
+명령은 에러 없이 완료됐지만, 파일을 확인하면 `ORANGE`가 그대로 남아있었다.
+
+## 원인 분석
+
+macOS에 기본 탑재된 `sed`는 **BSD sed**로, GNU sed와 다르게 `\b` (단어 경계) 정규식을 지원하지 않는다.
+
+| 도구            | `\b` 지원 |
+| --------------- | --------- |
+| GNU sed (Linux) | ✅        |
+| BSD sed (macOS) | ❌        |
+| perl            | ✅        |
+| grep -P (PCRE)  | ✅        |
+
+`\b`가 무시되면서 패턴이 매칭 자체를 못 하거나 예상과 다르게 동작한다.
+
+## 해결 방법
+
+`perl -pi -e`로 대체:
+
+```bash
+find . \( -name "*.ts" -o -name "*.tsx" \) | \
+  xargs perl -pi -e 's/\bORANGE\b/palette.primary/g'
+```
+
+perl은 macOS에 기본 설치되어 있고 PCRE(`\b` 포함)를 완벽히 지원한다.
+
+## 배운 점
+
+- macOS에서 `sed`를 쓸 때 `\b`, `\w`, `\d` 같은 PCRE 패턴은 동작하지 않는다
+- 단순 문자열 치환 → `sed -i '' 's/OLD/NEW/g'` (BSD sed도 OK)
+- 단어 경계 필요 → `perl -pi -e 's/\bOLD\b/NEW/g'`
+- GNU sed가 필요하면 `brew install gnu-sed` 후 `gsed` 사용
+- 치환 결과를 반드시 `grep`으로 재확인하는 습관이 중요

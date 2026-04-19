@@ -1,0 +1,104 @@
+---
+title: '[퀀트 개발 일지] 2026-04-07 — Combo 전략 실거래 첫 배포'
+date: '2026-04-07'
+tags: ['quantitative-trading', 'python', 'binance', 'algorithm', 'daily-log', 'live-trading']
+draft: false
+summary: 'EMA Alignment 전략 10시간 모의 실행 → 전략 비교 시뮬레이션 → Combination 전략 실거래 첫 배포'
+---
+
+> 퀀트 개발자를 향한 여정. 매일 한 줄씩.
+
+## 오늘 한 일
+
+### 1. EMA Alignment 전략 모의 실행 (10시간)
+
+ETHUSDT, 15분봉, 레버리지 20배 설정으로 `ema_alignment` 전략을 백그라운드 모의 실행했다.
+
+```
+전략: ema_alignment (EMA 8/21/50, volume_mult=1.2)
+심볼: ETHUSDT
+타임프레임: 15m
+레버리지: x20
+```
+
+10시간 동안 신호 **0회**. ETH가 $2,155 → $2,076 사이 좁은 횡보 구간에 갇혀 EMA 배열 전환이 한 번도 발생하지 않았다.
+
+---
+
+### 2. 파라미터 변형 + 전략별 신호 수 시뮬레이션
+
+"파라미터를 수정했다면 얼마나 신호를 잡을 수 있었을까?" 라는 질문에서 시작해 최근 200캔들(약 2일) 기준으로 전체 전략 신호 수를 시뮬레이션했다.
+
+| 전략                 | LONG | SHORT | 합계   |
+| -------------------- | ---- | ----- | ------ |
+| Sideways Range       | 23   | 36    | **59** |
+| MACD                 | 7    | 7     | 14     |
+| Bollinger            | 2    | 5     | 7      |
+| Bollinger Breakout   | 5    | 2     | 7      |
+| HF Scalp             | 2    | 4     | 6      |
+| RSI                  | 1    | 4     | 5      |
+| EMA Alignment (현재) | 0    | 0     | **0**  |
+
+**결론**: 횡보장에서 EMA Alignment는 완전히 무력했다. `Sideways Range`가 압도적으로 많은 신호를 냈지만, 신호 과다로 과매매 위험이 있다.
+
+---
+
+### 3. Combo 전략 파라미터별 손익 백테스트
+
+실거래 전환 전, Combination 전략의 조합/임계값을 6가지로 변형해 손익 시뮬레이션을 돌렸다. (시드 $18, 레버리지 20배)
+
+| 조합                                 | 거래 | 승률 | 손익        | 잔액   |
+| ------------------------------------ | ---- | ---- | ----------- | ------ |
+| **기본 (SDO+RSI+BB, min=2, th=2.0)** | 1    | 100% | **+$13.64** | $31.64 |
+| RSI+MACD+BB, min=2, th=1.5           | 1    | 100% | +$8.34      | $26.34 |
+| 완화 (SDO+RSI+BB, min=1, th=1.0)     | 1    | 0%   | -$3.79      | $14.21 |
+| RSI+MACD+BB, min=1, th=1.0           | 1    | 0%   | -$3.79      | $14.21 |
+
+임계값을 낮출수록 신호 퀄리티가 떨어져 오히려 손실이 났다. **기본 설정(min=2, th=2.0)이 가장 보수적이면서도 수익이 좋았다.**
+
+---
+
+### 4. 홈 서버에 Combination 전략 실거래 배포
+
+최종 설정:
+
+```env
+TRADING_MODE=live
+STRATEGY=combination
+SYMBOLS=ETHUSDT
+LEVERAGE=20
+MAX_POSITION_SIZE=100
+TIMEFRAME=15m
+COMBO_STRATEGIES=sdo_v2=3.0,rsi=1.5,bollinger=1.0
+COMBO_BUY_THRESHOLD=2.0
+COMBO_SELL_THRESHOLD=2.0
+COMBO_MIN_AGREEING=2
+```
+
+홈 서버(`192.168.45.68`)에 SSH 접속 후 백그라운드로 실행:
+
+```bash
+nohup venv/bin/python main_futures.py >> data/logs/combo_live_20260407.log 2>&1 &
+```
+
+실거래 첫 배포 성공. 현재 ETH $2,082 기준 대기 중.
+
+---
+
+## 오늘의 교훈
+
+- **전략은 시장 국면에 맞아야 한다.** EMA Alignment는 추세 전환 전략이라 횡보장에서 완전히 먹히지 않는다.
+- **임계값은 신중하게.** 신호를 더 잡으려고 임계값을 낮추면 노이즈 신호도 같이 들어온다.
+- **코드를 짜기 전에 시뮬레이션 먼저.** 배포 전 간단한 백테스트 루프만으로도 전략 퀄리티를 빠르게 검증할 수 있었다.
+
+---
+
+## 다음 할 일
+
+- [ ] Combination 전략 신호 발생 후 실거래 결과 추적
+- [ ] 잔액이 100 USDT 초과 시 포지션 크기 자동 조정 로직 검토
+- [ ] systemd 서비스 파일 경로 수정 (현재 경로 불일치)
+
+---
+
+_SDO Auto Trader Crypto — Binance Futures 자동매매 봇 개발 중_

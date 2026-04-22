@@ -1,0 +1,332 @@
+---
+title: '알림이 4시간 조용히 멎어도 몰랐다 — Prometheus + Grafana + AWS CloudWatch 모니터링 설계'
+date: 2026-04-22
+tags: [quantitative-trading, devops, prometheus, grafana, aws, monitoring, observability]
+summary: "오늘 가장 뼈아팠던 순간은 Discord 알림이 4시간 동안 silent 멎었는데 내가 그걸 몰랐다는 것이다. 자동화를 '자동화한 건 잘 굴러가겠지' 정신으로 두면 언젠가 당한다. Prometheus 메트릭 수집 + Grafana 대시보드 + AWS CloudWatch 로그 백업 3단 설계."
+---
+
+> 오늘의 블로그 시리즈 ([Part 1](./2026-04-22-onchain-filter-team-review), [Part 2](./2026-04-22-websocket-exchange-native-sl-tp), [Part 3](./2026-04-22-attack-mode-mark-price-realtime))의 **마지막 편 — 설계 중심 Part 4**. 구현은 다음 주에 할 예정.
+
+## 오늘의 가장 아픈 순간
+
+오전에 봇을 재시작하면서 실수로 `.env` rewrite 중 **Discord 설정 4개를 누락**시켰다. 그 결과:
+
+- 11:11 — ETH LONG 진입 (알림 ❌)
+- 16:15 — ETH LONG 재진입 (알림 ❌)
+- 18:15 — SOL LONG 진입 (알림 ❌)
+
+**3번의 실거래 진입이 조용히 일어났고, 나는 밤에 로그를 확인할 때까지 몰랐다.** 다행히 포지션은 전부 수익 중이었지만, 만약 그 사이 청산됐으면? 계좌가 털려도 몰랐을 것이다.
+
+DevOps 리드 박현석이 아침 리뷰에서 지적한 그대로다.
+
+> "모니터링 0, heartbeat 없음. 봇이 죽어도 아무도 모름."
+
+맞다. Discord webhook 하나에 의존하는 지금 구조는, Discord가 막히면 봇이 죽어도 침묵이다. **감지 가능한 구조**가 아니다. 관찰할 수 있어야 관리할 수 있다 (Observable → Manageable).
+
+## 제안하는 3단 설계
+
+```
+[라즈베리파이]                      [라즈베리파이 or 근처]          [AWS]
+┌──────────────┐                   ┌──────────────────────┐      ┌───────────────┐
+│ 봇 (metrics) │──15s scrape──→    │ Prometheus (TSDB)    │      │ CloudWatch    │
+│ :9090/metrics│                   │ + Grafana (대시보드)  │      │ Logs (백업만) │
+└──────────────┘                   │ + Alertmanager       │      └───────────────┘
+        │                          └──────────────────────┘              ▲
+        │                                    │                           │
+        └────────(로그 파일)──────────────────┴───(CloudWatch Agent)──────┘
+```
+
+**핵심 원칙**:
+
+1. 메트릭·대시보드는 **라즈베리파이에 유지** — 지연·비용·데이터 주권
+2. AWS는 **로깅 백업**만 — SD카드 손상 방지, 장기 보관
+3. Discord 알림은 **Grafana Alerting**으로 일원화 (지금처럼 코드 안에 흩뿌리지 않기)
+
+## Layer 1: 메트릭 수집 (`prometheus_client`)
+
+봇이 자기 상태를 `/metrics` HTTP 엔드포인트로 노출. 설치는 `pip install prometheus-client` 한 줄.
+
+### 메트릭 8종
+
+```python
+# utils/metrics.py
+from prometheus_client import Counter, Gauge, Histogram, start_http_server
+
+bot_uptime_seconds = Counter("bot_uptime_seconds", "봇 누적 실행 시간")
+bot_positions = Gauge(
+    "bot_positions_total", "현재 보유 포지션 수", ["symbol", "side"]
+)
+bot_daily_pnl = Gauge("bot_daily_pnl_usdt", "오늘 실현 손익 (USDT)")
+bot_unrealized_pnl = Gauge(
+    "bot_unrealized_pnl_usdt", "미실현 손익 (USDT)", ["symbol"]
+)
+bot_orders = Counter(
+    "bot_orders_total", "주문 카운트", ["type", "status"]
+)
+bot_filter_blocked = Counter(
+    "bot_filter_blocked_total", "필터에 의한 진입 차단",
+    ["filter_name", "symbol"]
+)
+bot_api_latency = Histogram(
+    "bot_api_latency_seconds", "Binance API 호출 지연시간",
+    ["endpoint"],
+    buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+)
+bot_ws_events = Counter(
+    "bot_ws_events_total", "WS 이벤트 수신 카운트", ["type"]
+)
+bot_errors = Counter(
+    "bot_errors_total", "에러 카운트", ["category"]
+)
+
+def start_metrics_server(port: int = 9090) -> None:
+    start_http_server(port)
+```
+
+### 메트릭 선택 근거
+
+| 메트릭                     | 왜?                                                          |
+| -------------------------- | ------------------------------------------------------------ |
+| `bot_uptime_seconds`       | 프로세스 죽었는지 15초 내 감지 (`up{job="bot"} == 0`)        |
+| `bot_positions_total`      | 내가 지금 뭘 들고 있는지 실시간                              |
+| `bot_daily_pnl_usdt`       | **일일 손실 한도 근접 시 알람** (오늘 같은 "몰래 진입" 감지) |
+| `bot_filter_blocked_total` | 필터가 얼마나 진입을 막고 있는지 → 너무 엄격한지 판단        |
+| `bot_api_latency_seconds`  | **Binance API 장애 조기 감지** (p99 > 5s면 뭔가 이상)        |
+| `bot_ws_events_total`      | WS가 살아있는지 (rate == 0이면 연결 끊긴 것)                 |
+| `bot_errors_total`         | 에러 카테고리별 집계 (예: `-4120` 빈도)                      |
+
+### 코드 통합 지점
+
+`futures_trader.py`의 주요 이벤트:
+
+```python
+# _open_position 끝부분
+bot_positions.labels(symbol=symbol, side=side).set(1)
+bot_orders.labels(type="open", status="success").inc()
+
+# _close_position 끝부분
+bot_positions.labels(symbol=symbol, side=pos.side).set(0)
+bot_daily_pnl.set(self._daily_pnl)
+bot_orders.labels(type="close", status="success").inc()
+
+# _can_open_new_position 각 필터에서
+if is_funding_window(...):
+    bot_filter_blocked.labels(filter_name="time", symbol=symbol).inc()
+    return False
+
+# _drain_ws_events에서
+bot_ws_events.labels(type=event["type"]).inc()
+```
+
+## Layer 2: Prometheus + Grafana (Docker Compose)
+
+`docker-compose.monitoring.yml`:
+
+```yaml
+version: '3.9'
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - '9091:9090'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - '3000:3000'
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:
+```
+
+`prometheus.yml`:
+
+```yaml
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'sdo-trader-bot'
+    static_configs:
+      - targets: ['host.docker.internal:9090']
+```
+
+### 필수 대시보드 패널 8개
+
+| 패널               | PromQL                                                               |
+| ------------------ | -------------------------------------------------------------------- |
+| 봇 생존            | `up{job="sdo-trader-bot"}`                                           |
+| 오늘 PnL           | `bot_daily_pnl_usdt`                                                 |
+| 미실현 PnL by 심볼 | `bot_unrealized_pnl_usdt`                                            |
+| 포지션 히트맵      | `bot_positions_total`                                                |
+| 진입 차단 Top 5    | `topk(5, sum by (filter_name) (rate(bot_filter_blocked_total[1h])))` |
+| API 지연 p99       | `histogram_quantile(0.99, rate(bot_api_latency_seconds_bucket[5m]))` |
+| WS 이벤트 rate     | `rate(bot_ws_events_total[5m])`                                      |
+| 에러 빈도          | `rate(bot_errors_total[15m])`                                        |
+
+## Layer 3: Grafana Alerting (Discord 통합)
+
+```yaml
+groups:
+  - name: bot-critical
+    rules:
+      - alert: BotDown
+        expr: up{job="sdo-trader-bot"} == 0
+        for: 1m
+        annotations:
+          summary: '🚨 자동매매 봇 다운'
+
+      - alert: DailyLossHigh
+        expr: bot_daily_pnl_usdt < -6
+        for: 5m
+        annotations:
+          summary: '⚠️ 일일 손실 한도 근접'
+
+      - alert: ApiLatencyHigh
+        expr: histogram_quantile(0.99, rate(bot_api_latency_seconds_bucket[5m])) > 5
+        for: 10m
+        annotations:
+          summary: '⚠️ Binance API p99 > 5s'
+
+      - alert: WsEventsZero
+        expr: rate(bot_ws_events_total[10m]) == 0
+        for: 15m
+        annotations:
+          summary: '⚠️ WebSocket 이벤트 15분간 없음'
+```
+
+Contact point는 **기존 Discord webhook(또는 bot channel)** 재활용. 즉 지금 내 로직에 박혀있는 Discord 알림 코드를 **Grafana에 위임**. 훨씬 깔끔하고, 봇 코드가 얇아짐.
+
+## Layer 4: AWS는 로깅만
+
+Grafana/Prometheus를 AWS에 안 올리는 이유:
+
+- **비용**: EC2 t4g.small ($15/월) + Grafana Cloud ($9+/월) vs. 라즈베리파이 $0
+- **지연**: 로컬이 압도적으로 빠름 (15s scrape 주기에 네트워크 RTT 추가되면 누락 위험)
+- **데이터 주권**: 내 거래 PnL이 외부 클라우드에 쌓이는 건 좀...
+
+그래서 AWS는 **로그 백업** 용도로만.
+
+### CloudWatch Logs (옵션 L1 — 추천)
+
+```bash
+# 라즈베리파이에 CloudWatch Agent 설치
+sudo wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb
+sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+```
+
+IAM 최소 권한:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+  "Resource": "arn:aws:logs:ap-northeast-2:*:log-group:/sdo-trader/*"
+}
+```
+
+Agent 설정:
+
+```json
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/home/seodong-og/project/sdo_auto_trader_crypto/data/logs/trader_*.log",
+            "log_group_name": "/sdo-trader/trader",
+            "log_stream_name": "{hostname}",
+            "retention_in_days": 90
+          },
+          {
+            "file_path": "/home/seodong-og/project/sdo_auto_trader_crypto/data/logs/error_*.log",
+            "log_group_name": "/sdo-trader/error",
+            "log_stream_name": "{hostname}",
+            "retention_in_days": 365
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+**월 비용**: 현재 로그 발생량 ~1MB/day 기준으로 **$0.025 수준**. 무시 가능.
+
+### 옵션 L2: S3 + Glacier (더 저렴, 조회 느림)
+
+cron으로 매일 자정 `aws s3 sync`. Standard 90일 → Glacier Deep Archive 자동 이전 시 **월 $0.004**. 조회 시 12시간 대기 필요.
+
+## 구현 로드맵 (4단계, 총 1.5~2일)
+
+| Phase | 작업                                  | 예상 시간 |
+| ----- | ------------------------------------- | --------- |
+| 1     | `utils/metrics.py` + 코드 통합        | 반나절    |
+| 2     | Docker Compose (Prometheus + Grafana) | 1시간     |
+| 3     | 대시보드 + 알람 설정                  | 반나절    |
+| 4     | CloudWatch Agent + IAM 설정           | 1시간     |
+
+### 체크리스트
+
+- [ ] `pip install prometheus-client==0.20.0`
+- [ ] `utils/metrics.py` 작성
+- [ ] `main_futures.py`에 `start_metrics_server()` 추가
+- [ ] `futures_trader.py` 주요 이벤트에 메트릭 업데이트
+- [ ] `docker-compose -f docker-compose.monitoring.yml up -d`
+- [ ] Prometheus targets에서 bot 스크레이핑 확인
+- [ ] Grafana Data source 연결 + 대시보드 JSON import
+- [ ] 알람 3개 설정 + Discord 연동
+- [ ] CloudWatch Agent 설치 + IAM Role + 첫 로그 업로드 확인
+
+## 알려진 함정
+
+1. **Prometheus 카디널리티 폭발** — `symbol`은 3종이라 OK, `client_order_id`는 절대 라벨로 쓰지 말 것
+2. **Gauge vs Counter** — 현재 상태는 Gauge, 누적 카운트는 Counter. 헷갈리면 alert 오동작
+3. **라즈베리파이 SD 카드 수명** — Prometheus TSDB는 writes 많음. 외부 SSD나 tmpfs 고려
+4. **Grafana admin 기본 password** — `GF_SECURITY_ADMIN_PASSWORD` 반드시 설정 (안 하면 5분 내 크립토 마이닝 당함)
+5. **메트릭 포트(:9090) 외부 노출 금지** — 내 포지션 정보 유출 위험
+
+## 왜 지금 이 글을 쓰는가
+
+구현 전에 설계를 블로그로 정리해두는 이유:
+
+1. **구현 전 검증** — 글로 써보면서 논리 구멍 찾기
+2. **미래의 나에게 설명** — 2주 뒤에 "왜 이 선택이었지?" 물을 때 답변
+3. **공개 선언 효과** — 쓴 대로 안 하면 부끄러우니 실행 동력
+
+Part 2에서 "해결했다"고 쓰고 다음 날 정정한 부끄러움을 반복하지 않기 위해, 이 글은 명확히 **"다음 주 계획"**으로 명시한다. 실제 배포 후 검증되면 Part 5로 업데이트 포스트를 쓸 예정.
+
+## 오늘 하루 결산
+
+- **Part 1**: 온체인 필터 3종 (시간/funding/L/S)
+- **Part 2**: WS User Data Stream + 거래소 SL/TP 이중화
+- **Part 3**: -4120 정정 + 공격 모드 + Mark Price 1초 WS
+- **Part 4 (여기)**: Prometheus + Grafana + CloudWatch 모니터링 설계
+
+구현과 설계가 4 대 1 비율인데, 사실 오늘 가장 뼈아픈 교훈은 **"관찰 불가능한 시스템은 관리 불가능하다"** 이다. 내일의 첫 작업은 `utils/metrics.py`가 될 것 같다.
+
+오늘 동안 만든 실제 작동 코드:
+
+- `utils/time_filter.py`, `utils/funding_filter.py`, `utils/onchain_filter.py`
+- `utils/attack_mode.py`
+- `core/ws_manager.py` (User Data Stream)
+- `core/ws_market.py` (Mark Price 1s)
+- `core/futures_client.py` (-4120 수정)
+- `core/futures_trader.py` (위 전부 통합)
+
+잔고 66 USDT → 94 USDT (+27 USDT 실현 수익). 하지만 수익보다 값진 건 **"자동화를 맹신하지 않는 법"**을 몸으로 배운 것. 내일부터는 Prometheus가 대신 지켜본다.

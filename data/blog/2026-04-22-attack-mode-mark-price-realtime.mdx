@@ -1,0 +1,240 @@
+---
+title: "블로그에 '해결했다'고 써놓고 하루 만에 정정 — 거래소 SL/TP 실패, 공격 모드 설계, 1초 단위 실시간 체크"
+date: 2026-04-22
+tags: [quantitative-trading, python, binance, websocket, attack-mode, risk-management, algorithm]
+summary: "오전에 쓴 Part 2에서 '거래소 STOP_MARKET 주문으로 봇 다운 방어를 구현했다'고 단언했다. 그날 밤 로그를 보니 8번 연속 -4120 에러로 실패 중이었다. 정정하면서 공격 모드와 Mark Price 1초 WebSocket까지 통합 설계한 과정."
+---
+
+> 이 포스트는 [Part 1: 온체인 필터](./2026-04-22-onchain-filter-team-review), [Part 2: WS + 거래소 SL/TP 이중화](./2026-04-22-websocket-exchange-native-sl-tp)의 **Part 3**이자 정정 기록이다.
+
+## 오전에 쓴 글이 저녁에 거짓말이 됐다
+
+Part 2에서 이렇게 단언했다.
+
+> 과거의 내가 `-4120` 에러 보고 "안 되네" 하고 주석 처리했던 거다. 강민수가 "이거 왜 비활성화된 거예요?"라고 짚어주지 않았으면 앞으로도 계속 방치됐을 거다.
+>
+> `workingType="MARK_PRICE"`로 명시하고 `priceProtect=true` 붙이니까 바로 성공.
+
+실거래 재시작 후 한참 뒤에 운영 상태 점검하려고 에러 로그를 봤다.
+
+```
+2026-04-22 11:11:00 | ERROR | core.futures_client:241 -
+  거래소 손절 주문 실패 (ETHUSDT stop=2314.58):
+  APIError(code=-4120): Order type not supported for this endpoint.
+  Please use the Algo Order API endpoints instead.
+```
+
+**8번 연속 실패**. 오전에 "해결했다"고 블로그에 쓴 바로 그 에러가 계속 찍히고 있었다. 블로그 첫 업데이트하고 검증도 안 하고 글부터 쓴 대가다.
+
+## 왜 실패했나
+
+`-4120`은 Binance가 **"이 엔드포인트로는 이 타입 주문 안 받아"**라고 말하는 에러. Binance Futures는 최근 `closePosition=true` 조합 일부를 **Algo Order API**(별도 엔드포인트)로 이전했는데, python-binance 1.0.19의 `futures_create_order`는 일반 Order API 엔드포인트만 호출한다. 그래서 계속 reject.
+
+### 정답 — quantity + reduceOnly 조합
+
+구식이지만 확실한 방법:
+
+```python
+def place_stop_loss(self, symbol, side, quantity, stop_price) -> Optional[dict]:
+    close_side = "SELL" if side == "LONG" else "BUY"
+    price_precision = self.get_price_precision(symbol)
+    qty_precision = self.get_quantity_precision(symbol)
+    formatted_price = f"{stop_price:.{price_precision}f}"
+    formatted_qty = f"{quantity:.{qty_precision}f}"
+    try:
+        order = self._client.futures_create_order(
+            symbol=symbol,
+            side=close_side,
+            type="STOP_MARKET",
+            stopPrice=formatted_price,
+            quantity=formatted_qty,       # ← closePosition 빼고
+            reduceOnly="true",             # ← reduceOnly로 대체
+            workingType="MARK_PRICE",
+            priceProtect="true",
+        )
+        return order
+    except BinanceAPIException as e:
+        logger.error(f"거래소 손절 주문 실패 ({symbol}): {e}")
+        return None
+```
+
+차이:
+
+- `closePosition="true"` → **전체 포지션 강제 청산** (quantity 없어도 됨)
+- `quantity + reduceOnly="true"` → **지정 수량만 청산, 포지션 축소 전용**
+
+후자가 Binance에서 더 오래된/안정적인 조합. closePosition은 Algo API로 이전되면서 일반 API에서 막힌 것으로 보인다.
+
+## 공격 모드 설계
+
+리뷰에서는 "리스크 관리"만 다뤘는데, 실제 운용자(나)는 **매우 공격적인 성향**이고 필요할 땐 30x 레버리지 올인까지 한다. 평소엔 보수, 기회 오면 공격 — 이 하이브리드를 코드에 구현한다.
+
+### 트리거 조건 (AND)
+
+```python
+def detect_volatility_spike(df, atr_multiplier=3.0, lookback_bars=5, price_change_pct=3.0):
+    # ① 현재 ATR / 최근 20봉 평균 ATR > 3.0배
+    atr = TechnicalIndicators.atr(high, low, close, period=14)
+    curr_atr = float(atr.iloc[-1])
+    avg_atr = float(atr.iloc[-21:-1].mean())
+    atr_ratio = curr_atr / avg_atr
+
+    # ② 최근 5봉(75분) 가격 변동 절댓값 > 3%
+    price_now = float(close.iloc[-1])
+    price_past = float(close.iloc[-6])
+    price_change = (price_now - price_past) / price_past * 100
+
+    is_atr_spike = atr_ratio >= atr_multiplier
+    is_price_spike = abs(price_change) >= price_change_pct
+    return is_atr_spike and is_price_spike
+```
+
+### 활성화 시 동작
+
+| 항목                    | 평소                         | 공격 모드              |
+| ----------------------- | ---------------------------- | ---------------------- |
+| 레버리지                | 20x                          | **30x**                |
+| 포지션 마진             | MAX_POSITION_SIZE × strength | **가용 잔고 × 50%**    |
+| 방향                    | 전략 신호                    | 전략 신호 (동일)       |
+| 필터 (시간/funding/L/S) | 작동                         | 작동 (안전장치는 유지) |
+
+### 안전 한도
+
+- **일일 최대 1회**: `AttackModeCounter` 클래스가 날짜 바뀌면 자동 리셋
+- 기존 포지션 보유 시 공격 진입 제외 (잔고 충돌 방지)
+- `entry_tag="attack_mode"` + 트리거 이유 함께 기록
+
+### 수치 선택 — 엄격형
+
+ATR 3.0배 + 3% / 5봉은 **"FOMC, 플래시크래시, 예상 외 뉴스"** 같은 큰 이벤트만 걸린다. 30x 레버리지에서 가격 -3.33% 역방향 = 청산이라는 걸 감안하면, 작은 노이즈에 공격 모드가 발동하면 안 된다. 엄격형이 정답.
+
+## 1초 단위 실시간 체크 — Mark Price WebSocket
+
+Part 2에서 이중화한 3개 레이어:
+
+- Layer 0: 봇 내부 폴링 (1분)
+- Layer 1: 거래소 STOP_MARKET (지금 정정 중)
+- Layer 2: User Data Stream (계정 이벤트)
+
+근데 Layer 0의 **1분 폴링 주기**가 30x 레버리지에서는 너무 느리다. 가격 SL을 관통했는데 봇이 최대 60초 뒤에 알아채면, 그 사이 추가로 -1%만 움직여도 -30% 마진 손실이 추가된다.
+
+해결: **Mark Price 1초 스트림 구독**.
+
+```python
+# core/ws_market.py
+from binance import ThreadedWebsocketManager
+
+class MarketDataWebSocket:
+    def __init__(self, symbols, event_queue, *, testnet=False):
+        self._symbols = symbols
+        self._queue = event_queue
+        ...
+
+    def _connect(self):
+        self._twm = ThreadedWebsocketManager(testnet=self._testnet)
+        self._twm.start()
+        for sym in self._symbols:
+            self._twm.start_symbol_mark_price_socket(
+                callback=self._on_message,
+                symbol=sym,
+                fast=True,   # True=1s interval, False=3s
+            )
+
+    def _on_message(self, msg):
+        if msg.get("e") != "markPriceUpdate":
+            return
+        self._queue.put({
+            "type": "MARK_PRICE",
+            "symbol": msg["s"],
+            "price": float(msg["p"]),
+        })
+```
+
+### Why Mark Price?
+
+Binance의 SL/TP 트리거는 기본적으로 Mark Price를 쓴다. Contract Price(체결가)는 스파이크에 조작 가능하고, 청산(liquidation) 계산도 Mark Price 기준. 그래서 우리도 Mark Price로 SL/TP 체크해야 일관성 있다.
+
+### Why Public Stream?
+
+Mark Price 스트림은 **인증 불필요**. API Key 없이 `wss://fstream.binance.com`에 바로 연결. 읽기 전용이라 위험도 낮다. User Data Stream(Part 2에서 구현한 것)과 완전 독립된 별도 WS 연결.
+
+### 반응 속도 비교
+
+| 시나리오                    | 현재 (1분 폴링)     | Mark Price 1초 WS |
+| --------------------------- | ------------------- | ----------------- |
+| SL 터치 → 감지              | 최대 **60초**       | 최대 **1초**      |
+| 가격 1% 역방향 / 60초 (30x) | -30% 마진 추가 손실 | **-0.5% 마진**    |
+| 플래시 크래시 대응          | 불가능              | **가능**          |
+
+## 통합 아키텍처
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ User Data Stream WS (private, 기존)                       │
+│  - ACCOUNT_UPDATE / ORDER_TRADE_UPDATE                   │
+│  - 수동매매 / 외부청산 실시간 감지                         │
+├──────────────────────────────────────────────────────────┤
+│ Market Data Stream WS (public, 신규)                      │
+│  - Mark Price @ 1s × N symbols                           │
+│  - 별도 워커 스레드: Queue.get() → _check_sl_tp           │
+│  - SL/TP 반응 속도 60s → 1s                               │
+├──────────────────────────────────────────────────────────┤
+│ APScheduler (기존, 유지)                                  │
+│  - 1분마다 run_all_symbols()                             │
+│  - 전략 신호 생성 + 진입 결정                              │
+│  - 공격 모드 트리거 체크                                   │
+├──────────────────────────────────────────────────────────┤
+│ 거래소 예약 주문 (Layer 1, 정정)                          │
+│  - STOP_MARKET + quantity + reduceOnly=true              │
+│  - 봇 다운 시 거래소가 자동 청산                          │
+└──────────────────────────────────────────────────────────┘
+```
+
+## 오늘 하루 정리
+
+시간 순으로:
+
+1. **08시 무렵** — 팀 리뷰 5인 (리스크/퀀트/크립토/백엔드/DevOps)
+2. **09시** — 신하준 피드백 전면 적용 (심볼 3종 분산, RSI/Ichimoku 제거, 필터 3종), 배포 + 봇 재시작
+3. **오전 내내** — Part 1 블로그 포스팅
+4. **점심 무렵** — 강민수/윤재호 피드백 반영 (WS User Data Stream, 거래소 SL/TP 이중화), Part 2 포스팅
+5. **밤** — 로그 확인 → **-4120 에러 발견** (블로그에 해결했다 쓴 내용이 거짓)
+6. **이어서** — 포지션 사이징 문제 발견 (strength 하한 0.5 때문에 MAX의 절반만 사용)
+7. **디스코드 알림 누락 발견** — 내가 .env rewrite하면서 Discord 설정 4개를 누락시킨 게 원인. 복원.
+8. **공격 모드 설계** — 보수 기본 + 급변 시 30x 50% 집중
+9. **Mark Price WS 설계** — 1초 단위 실시간 SL/TP
+10. **포지션 전량 청산** — +27.65 USDT 실현
+11. **통합 구현 진행 중** — 이 글을 쓰는 지금 `futures_trader.py`에 Market Data WS / 공격 모드 통합 작업 중
+
+## 배운 점
+
+### 1. 블로그에 "해결했다"고 쓰기 전에 24시간 돌려봐라
+
+오전 11:11 첫 진입 시 이미 SL/TP 주문이 -4120으로 실패했는데, 나는 그걸 모르고 블로그에 "해결" 단언. 실전 검증 없이 코드 한 번 돌려보고 "잘 되는 것 같네"로 단언한 결과. **포스트는 느려도 되지만, 신뢰는 한 번 잃으면 회복 오래 걸린다.**
+
+### 2. 자동화했다고 안전한 건 아니다
+
+Discord 알림은 자동화 돼 있다고 믿었는데, 실제로는 `.env` 실수 하나로 silent 무시. 3번의 진입/보유 중 수익 변동을 전혀 못 봤다. **모든 자동화는 "이게 진짜 작동 중인지" 주기적 검증 필요**. Prometheus + Grafana가 왜 필요한지 오늘 체감했다.
+
+### 3. 공격 성향은 "시스템화"해야 안전하다
+
+"가격 급변할 때 50% 올인"이라는 감에 의존하던 걸 수치로 뽑아냈다: ATR 3× + 3%/5봉 AND 조건, 일일 1회. 이렇게 시스템화된 공격은 감정이 개입할 여지가 없다. Kelly Criterion에서 "풀 Kelly 넘어가면 장기 기대 수익 음수"라는 증명도 함께 기억해둔다.
+
+### 4. 1초와 60초의 차이
+
+30x 레버리지에서 SL 반응 지연은 **지연 × 30배의 손실**로 증폭된다. 60초 폴링에서 가격이 추가 1% 움직이면 마진 -30% 추가 손실. Mark Price WS로 1초 단위로 바꾸면 같은 시나리오에서 -0.5%. **60배 차이**. 이게 실시간 데이터 인프라가 가치 있는 이유.
+
+### 5. "Private repo니까 괜찮아"의 함정 (아님)
+
+오늘 중간에 `.env.sol_paper`가 public GitHub에 노출된 것 같아서 긴급 Key 회전 가이드를 썼는데, 알고 보니 private repo였다. 내가 확인도 안 하고 경고 톤으로 썼다. **확인은 10초, 정정은 10분**. 늘 10초를 선택하자.
+
+## 다음 작업 (내일)
+
+- [ ] `futures_trader.py` 통합 완료:
+  - Mark Price WS queue drain 스레드
+  - 공격 모드 분기 + 레버리지 동적 변경
+  - 일일 카운터 통합
+- [ ] 배포 + 봇 재시작
+- [ ] 실전 검증 로그 확인 (이번엔 "해결했다" 전에 24시간 돌려볼 것)
+
+그리고 박현석이 말한 **Prometheus + Grafana** — 이게 제일 크다. 오늘 "Discord 알림이 4시간 동안 조용히 멎었는데 내가 몰랐다"는 이 경험, Prometheus 대시보드였으면 15초 만에 발견됐을 거다. 다음 큰 작업은 여기다.

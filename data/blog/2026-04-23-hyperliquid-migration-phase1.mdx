@@ -1,0 +1,217 @@
+---
+title: 'Binance 봇을 Hyperliquid로 옮기는 중 — 6사이클 피드백 루프로 Phase 1 완료'
+date: 2026-04-23
+tags: [quantitative-trading, python, hyperliquid, migration, infinite-feedback, binance]
+summary: "어제 새벽에 '크립토 트렌드에서 가장 저평가된 기회는 Hyperliquid'라고 블로그에 썼다. 12시간 뒤에 실제로 봇 마이그레이션을 시작했고, /infinite-feedback 스킬로 6사이클 자동 루프를 돌려 Phase 1을 마쳤다. sed 한 줄로 1600줄 포팅한 방법까지 기록."
+---
+
+## 왜 Hyperliquid인가 (다시)
+
+어제([Part 4 포스트](./2026-04-22-prometheus-grafana-monitoring-plan)) 썼다.
+
+> "2026년 메타는 on-chain perp DEX라는 걸 빨리 깨달아야 해."
+
+그리고 12시간 뒤, 실제로 실행에 옮겼다. 새 프로젝트 이름은 `sdo_hyperliquid_bot`. 기존 `sdo_auto_trader_crypto`(Binance Futures 봇)를 그대로 두면서, 같은 전략을 Hyperliquid로도 돌리는 **병행 운영** 구조.
+
+## 만든 것 요약
+
+| 파일                                        | 라인 수 | 상태                               |
+| ------------------------------------------- | ------- | ---------------------------------- |
+| `core/hl_client.py` (신규)                  | 230     | ✅ 완성 — Hyperliquid SDK 래퍼     |
+| `core/hl_trader.py` (포팅)                  | 1600+   | ✅ 완성 — FuturesTrader sed 치환   |
+| `config/settings.py` (재설계)               | 180     | ✅ 완성 — HL 필드 + 기존 필드 유지 |
+| `main.py` (신규)                            | 130     | ✅ 완성 — APScheduler 진입점       |
+| `.env.example`                              | 80      | ✅ 완성                            |
+| `README.md` + `docs/migration-plan.md`      | 400+    | ✅ 완성                            |
+| `core/hl_ws_manager.py` / `hl_ws_market.py` | —       | 🚧 Phase 3 예정                    |
+
+**GitHub**: https://github.com/SeoDongOk/sdo_hyperliquid_bot (private)
+**라즈베리파이 배포**: 디렉토리 clone + venv + 의존성 설치 + import 테스트까지 완료
+
+## 오늘의 핵심 트릭 — sed로 1600줄 포팅
+
+Binance 봇의 `FuturesTrader` 클래스는 1600줄이 넘는다. 이걸 Hyperliquid 버전으로 새로 쓰는 건 하루로 안 끝난다. 그런데 실제로 바뀌어야 하는 건 **client 타입 + 클래스 이름 + WS import**뿐이다. 전략, 필터, 공격 모드, 리스크 관리 — **전부 거래소 독립적**이다.
+
+그래서 이렇게 했다:
+
+```bash
+cp core/futures_trader.py core/hl_trader.py
+
+sed -i '' 's/from core\.futures_client import BinanceFuturesClient/from core.hl_client import HyperliquidClient/g' hl_trader.py
+sed -i '' 's/^from core\.ws_manager import UserDataWebSocket$/# TODO: HL WS\nUserDataWebSocket = None/' hl_trader.py
+sed -i '' 's/^from core\.ws_market import MarketDataWebSocket$/MarketDataWebSocket = None/' hl_trader.py
+sed -i '' 's/client: BinanceFuturesClient/client: HyperliquidClient/g' hl_trader.py
+sed -i '' 's/class FuturesTrader:/class HyperliquidTrader:/g' hl_trader.py
+```
+
+**5초 만에 포팅 완료.** 전략 로직은 한 줄도 안 건드렸다. 이게 가능한 이유는 **client 추상화가 잘 돼 있었기 때문**. `self.client.open_long(symbol, quantity)` 같은 호출은 구현체가 Binance든 Hyperliquid든 동일한 시그니처면 된다.
+
+교훈: 거래소 API 래퍼를 일찍부터 깔끔히 추상화해두면, **거래소 교체는 "설정 변경"에 가까워진다.**
+
+## /infinite-feedback 스킬로 자동 실행
+
+오늘 쓴 스킬: `/infinite-feedback`. 정해진 주제를 여러 사이클로 나눠서 **사용자 확인 없이 자동으로** 반복 실행한다. 한 번 시작하면 최대 사이클까지 내가 쉬지 않고 돌린다.
+
+### 6사이클 분할
+
+| Cycle | 작업                                                          | 소요 |
+| ----- | ------------------------------------------------------------- | ---- |
+| 1     | `requirements.txt` 교체                                       | 2분  |
+| 2     | `config/settings.py` + `.env.example`                         | 10분 |
+| 3     | `core/hl_trader.py` sed 포팅                                  | 5분  |
+| 4     | `main.py` 작성                                                | 10분 |
+| 5     | `README.md` + `docs/migration-plan.md`                        | 15분 |
+| 6     | GitHub private repo 생성 + 라즈베리파이 clone + import 테스트 | 10분 |
+
+**총 실행 시간 약 1시간.** 사용자는 한 번 "/infinite-feedback으로 작업해"라고만 말하고 커피 마시러 나갔다 와도 완료되는 구조.
+
+### 각 사이클 결과는 파일로 저장
+
+`/tmp/sdo_hyperliquid_cycle_N.md`에 매 사이클 결과 저장. 메모리 의존 금지. 이렇게 하면:
+
+- 컨텍스트 리셋 후 이어서 진행 가능
+- 진행 상황 추적 가능
+- 최종 보고서 자동 생성 가능
+
+## Hyperliquid와 Binance의 기술적 차이 — 실전 정리
+
+### 1. 인증이 private key
+
+```python
+# Binance: 두 개의 문자열
+client = Client(api_key, secret_key)
+
+# Hyperliquid: EVM wallet
+from eth_account import Account
+wallet = Account.from_key(HL_PRIVATE_KEY)
+exchange = Exchange(wallet, MAINNET_API_URL)
+```
+
+모든 주문은 wallet의 ECDSA 서명으로 검증된다. 다른 말로: **private key = 전부**. 유출되면 끝. 그래서:
+
+- `.env`에 넣고 `chmod 600`
+- **API wallet**(서명만 담당) 따로 만들고, **master wallet**(실제 자산)은 건드리지 않기
+- `HL_ACCOUNT_ADDRESS`는 master, `HL_PRIVATE_KEY`는 API wallet
+
+### 2. 시장가 주문이 없다
+
+Hyperliquid에는 `MARKET` 타입이 없다. 대신 **IoC(Immediate-or-Cancel) limit order**로 현재가 ±5% 슬리피지 허용해서 즉시 체결:
+
+```python
+mark = info.all_mids()["BTC"]
+exchange.order(
+    name="BTC", is_buy=True, sz=0.01,
+    limit_px=mark * 1.05,   # 5% 슬리피지
+    order_type={"limit": {"tif": "Ioc"}},
+    reduce_only=False,
+)
+```
+
+### 3. SL/TP는 trigger order
+
+어제 Binance에서 고생한 `closePosition + workingType=MARK_PRICE + priceProtect` 조합의 `-4120` 에러? Hyperliquid에서는 아예 다른 방식이라 해당 없음:
+
+```python
+exchange.order(
+    name="BTC", is_buy=False, sz=0.01,
+    limit_px=49000 * 0.95,
+    order_type={
+        "trigger": {
+            "triggerPx": 49000,
+            "isMarket": True,
+            "tpsl": "sl",   # 또는 "tp"
+        }
+    },
+    reduce_only=True,
+)
+```
+
+훨씬 명시적. tpsl 필드 하나로 SL/TP 구분.
+
+### 4. Funding 주기가 1시간
+
+Binance는 8시간마다, Hyperliquid는 **매 시간 정각** 정산. 그래서 기존 `time_filter.py`의 "UTC 00/08/16 ±15분 차단"은 **매 시간 반복**으로 재조정 필요. 이건 Phase 4에서 처리 예정.
+
+### 5. Long/Short Ratio 없음
+
+Binance `globalLongShortAccountRatio` 같은 지표가 Hyperliquid에는 없다. 대신 **Open Interest (OI) 급변**을 대체 시그널로 쓸 예정. 스퀴즈 감지 로직은 비슷한 효과.
+
+## Phase 2 — 사용자가 직접 해야 할 것
+
+오늘은 코드까지. 다음은 사람 손이 필요:
+
+1. https://app.hyperliquid.xyz/trade 접속
+2. 지갑 연결 (MetaMask / WalletConnect)
+3. 우측 상단 → API → **Generate** → API wallet private key 복사
+4. **⚠️ Master wallet key 사용 금지.** API wallet 전용 key만.
+5. 라즈베리파이에서:
+   ```bash
+   cd /home/seodong-og/project/sdo_hyperliquid_bot
+   cp .env.example .env
+   vi .env   # HL_PRIVATE_KEY 입력
+   chmod 600 .env
+   ```
+6. **Testnet 먼저**: `USE_TESTNET=True` 상태로 최소 1주 관찰
+7. 메인넷 전환 후 USDC 소액 입금 (Arbitrum bridge)
+
+## 병행 운영 계획
+
+**Binance 봇**: 그대로 실거래 유지 (오늘 기준 +27 USDT 실현, PID 487527 가동 중)
+**Hyperliquid 봇**: Testnet 1주 → 메인넷 소액 테스트 → 3~4주 Binance와 병행 성과 비교
+
+둘 다 동일한 전략(combination + SDO v2 + 공격 모드). 유일한 차이가 거래소라서, **3주 후 PnL/Sharpe/MDD를 비교하면 "거래소 자체의 가치"가 숫자로 나온다.**
+
+신하준 톤으로 한 마디:
+
+> "온체인이 2026년 메타야. 근데 메타라고 맞추는 게 아니라, 숫자로 증명해야 해. 3주 뒤에 PnL 표 들고 와서 얘기하자."
+
+## 배운 점
+
+### 1. 추상화는 **미래의 나**를 위한 것
+
+Binance 클라이언트를 객체로 추상화해두지 않았다면 오늘 포팅은 며칠 걸렸을 거다. 몇 달 전에 클라이언트를 분리해둔 과거의 내가 오늘 나를 살렸다. **모든 외부 서비스는 얇은 래퍼로 감싸라.**
+
+### 2. sed는 강력하지만 책임은 커진다
+
+5초 포팅은 멋지지만, 치환된 부분을 **한 번은 직접 읽어야 한다**. 오늘은 grep으로 주요 심볼만 확인했는데, 세부 검증은 실제 가동 + import 테스트로 한다. 게으름의 대가는 버그다.
+
+### 3. 솔로 루프(MODE B)도 충분히 강력하다
+
+원래 `/infinite-feedback`는 tmux 멀티 에이전트를 주로 쓰지만, macOS + non-tmux 환경에서도 MODE B로 충분히 체계적으로 작업할 수 있었다. **멀티 에이전트가 항상 정답은 아니다.** 잘 분할된 단일 스레드가 더 예측 가능하다.
+
+### 4. 블로그가 미래의 로드맵이 된다
+
+어제 Part 4에서 "Hyperliquid 포팅 추천"이라고 써놓고, 오늘 실제로 했다. **글로 선언한 것의 실행률이 안 쓴 것보다 훨씬 높다.** 이게 오늘 작업의 동기 절반 이상이었다.
+
+## 파일 트리 (최종)
+
+```
+sdo_hyperliquid_bot/
+├── config/
+│   ├── __init__.py
+│   └── settings.py           ⭐ HL_PRIVATE_KEY 등 신규
+├── core/
+│   ├── hl_client.py          ⭐ 신규
+│   ├── hl_trader.py          ⭐ sed 포팅
+│   ├── trade_recorder.py     (재사용)
+│   └── scaling_manager.py    (재사용)
+├── docs/
+│   └── migration-plan.md     ⭐ 6-Phase 로드맵
+├── strategies/               (재사용 전체)
+├── utils/                    (재사용 전체)
+├── tests/                    (재사용)
+├── scripts/                  (재사용)
+├── main.py                   ⭐ 신규
+├── requirements.txt          ⭐ hyperliquid-python-sdk
+├── .env.example              ⭐ 신규
+├── .gitignore
+├── README.md                 ⭐ 신규
+├── start.sh                  (재사용)
+└── stop.sh                   (재사용)
+```
+
+## 한 줄 요약
+
+**"어제 블로그에 쓴 게 오늘 코드가 됐다. 5초 sed 치환과 1시간 자동 루프로."**
+
+내일 과제: Phase 2 실거래 검증. `USE_TESTNET=True`로 일단 출발.

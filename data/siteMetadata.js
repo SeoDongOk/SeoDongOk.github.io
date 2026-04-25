@@ -3,7 +3,8 @@ const siteMetadata = {
   title: 'DongOk Seo',
   author: 'DongOk Seo',
   headerTitle: 'DongOk Seo',
-  description: 'DongOk Seo의 프로젝트와 작업 기록을 정리한 포트폴리오',
+  description:
+    '퀀트 자동매매 봇을 만들고, 서버를 고치고, 일본어 단어를 외웁니다. 그 과정에서 막히고 배운 것들을 기록하는 블로그.',
   language: 'ko-kr',
   theme: 'light', // dark or light
   siteUrl: 'https://seo-dong-ok-github-io.vercel.app',

@@ -10,6 +10,20 @@ import { formatDate } from 'pliny/utils/formatDate'
 
 const MAX_DISPLAY = 5
 
+// Design Handoff — Category color & label mapping
+const CAT_COLOR: Record<string, string> = {
+  quant: '#c8a06a',
+  infra: '#7aabcc',
+  japan: '#cc7a9a',
+  misc: '#888',
+}
+const CAT_LABEL: Record<string, string> = {
+  quant: '퀀트',
+  infra: '인프라',
+  japan: '일본어',
+  misc: '기타',
+}
+
 const homeCopy: Record<
   Language,
   {
@@ -95,8 +109,25 @@ export default function Home({ posts }) {
         <section className="ambient-panel overflow-hidden rounded-[2rem] px-6 py-10 md:px-10 md:py-14">
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.8fr)]">
             <div>
-              <p className="text-xs tracking-[0.34em] text-stone-500 uppercase dark:text-stone-200">
-                {copy.label}
+              <p
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                className="text-[11px] tracking-[0.1em] text-stone-500 uppercase dark:text-stone-400"
+              >
+                DONGOK SEO · BLOG
+              </p>
+              {/* Design Handoff — Hero headline with serif emphasis on 日本語 */}
+              <h1
+                style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
+                className="mt-3 text-[28px] leading-[1.2] text-stone-900 sm:text-4xl md:text-[42px] dark:text-stone-100"
+              >
+                Quant · Dev ·{' '}
+                <em className="text-accent dark:text-accent" style={{ fontStyle: 'italic' }}>
+                  日本語
+                </em>
+              </h1>
+              <p className="mt-5 max-w-[480px] text-[15.5px] leading-[1.8] text-stone-600 dark:text-stone-400">
+                퀀트 자동매매 봇을 만들고, 서버를 고치고, 일본어 단어를 외웁니다.
+                <br />그 과정에서 막히고 배운 것들을 여기에 씁니다.
               </p>
               <HeroLanguageSwitch />
               <div className="mt-8 flex flex-wrap gap-3">
@@ -163,24 +194,50 @@ export default function Home({ posts }) {
         <ul className="divide-y divide-stone-300/70 dark:divide-stone-700/70">
           {!posts.length && copy.emptyMessage}
           {posts.slice(0, MAX_DISPLAY).map((post) => {
-            const { slug, date, title, summary, tags } = post
+            const { slug, date, title, summary, tags, category } = post
+            const cc = CAT_COLOR[category] || CAT_COLOR.misc
+            const catLabel = CAT_LABEL[category] || CAT_LABEL.misc
             return (
               <li key={slug} className="py-12">
                 <article>
                   <div className="space-y-3 xl:grid xl:grid-cols-[180px_minmax(0,1fr)] xl:items-start xl:gap-10 xl:space-y-0">
                     <dl>
                       <dt className="sr-only">{copy.publishedOn}</dt>
-                      <dd className="text-sm leading-6 font-medium tracking-[0.12em] text-stone-500 uppercase dark:text-stone-200">
+                      <dd
+                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                        className="text-[11px] leading-6 text-stone-500 dark:text-stone-400"
+                      >
                         <time dateTime={date}>{formatDate(date, siteMetadata.locale)}</time>
                       </dd>
                     </dl>
                     <div className="space-y-5">
                       <div className="space-y-5">
                         <div>
+                          {/* Design Handoff — Category badge */}
+                          {category && (
+                            <span
+                              style={{
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontSize: 9,
+                                fontWeight: 600,
+                                letterSpacing: '0.08em',
+                                color: cc,
+                                background: `${cc}1F`,
+                                border: `1px solid ${cc}4C`,
+                                padding: '3px 9px',
+                                borderRadius: 4,
+                                textTransform: 'uppercase',
+                                display: 'inline-block',
+                                marginBottom: 12,
+                              }}
+                            >
+                              {catLabel}
+                            </span>
+                          )}
                           <h3 className="text-2xl leading-8 font-bold tracking-tight text-stone-900 dark:text-stone-100">
                             <Link
                               href={`/blog/${slug}`}
-                              className="hover:text-primary-700 dark:hover:text-primary-400 transition"
+                              className="hover:text-accent dark:hover:text-accent transition"
                             >
                               {title}
                             </Link>

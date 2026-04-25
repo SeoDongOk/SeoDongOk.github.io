@@ -1,9 +1,9 @@
+// Design Handoff — category-based navigation
+// /quant, /infra, /japan are existing category routes (preserved from main)
 const headerNavLinks = [
-  { href: '/', title: 'Home' },
-  { href: '/quant', title: 'Quant' },
-  { href: '/infra', title: 'Infra' },
-  { href: '/japan', title: 'Japan' },
-  { href: '/projects', title: 'Projects' },
+  { href: '/quant', title: '퀀트' },
+  { href: '/infra', title: '인프라' },
+  { href: '/japan', title: '일본어' },
   { href: '/about', title: 'About' },
 ]
 

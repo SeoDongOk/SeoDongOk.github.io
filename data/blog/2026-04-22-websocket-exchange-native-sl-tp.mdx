@@ -3,6 +3,7 @@ title: '봇이 죽어도 손절은 되게 — WebSocket + 거래소 예약주문
 date: 2026-04-22
 tags: [quantitative-trading, python, binance, websocket, risk-management, algorithm]
 summary: "팀 리뷰에서 나온 가장 무서운 지적은 '파이썬이 1분마다 깨어나서 SL/TP를 체크하는 구조'였다. 봇이 15초만 멎어도 청산가까지 방치될 수 있는 그 구조를 어떻게 고쳤는지, WebSocket User Data Stream과 거래소 STOP_MARKET 주문을 2중화해서 해결한 과정."
+category: quant
 ---
 
 > 이 포스트는 [팀 리뷰로 바꾼 자동매매 봇 — 온체인 데이터를 필터로 쓰는 3가지 방법](./2026-04-22-onchain-filter-team-review)의 **Part 2**다. Part 1에서는 "진입을 어떻게 고를 것인가"를 다뤘고, 여기서는 "진입한 뒤에 죽지 않고 살아남을 것인가"를 다룬다.

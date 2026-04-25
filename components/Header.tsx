@@ -1,6 +1,5 @@
 import siteMetadata from '@/data/siteMetadata'
 import headerNavLinks from '@/data/headerNavLinks'
-import Logo from '@/data/logo.svg'
 import Link from './Link'
 import MobileNav from './MobileNav'
 import ThemeSwitch from './ThemeSwitch'
@@ -16,18 +15,21 @@ const Header = () => {
 
   return (
     <header className={headerClass}>
+      {/* Design Handoff — Logo: DM Serif "DongOk" + JetBrains Mono "Seo" */}
       <Link href="/" aria-label={siteMetadata.headerTitle}>
-        <div className="flex items-center justify-between">
-          <div className="mr-3 rounded-full border border-amber-900/15 bg-white/70 p-1.5 dark:border-amber-100/10 dark:bg-stone-900/60">
-            <Logo className="text-primary-700 dark:text-primary-300 h-7 w-7" />
-          </div>
-          {typeof siteMetadata.headerTitle === 'string' ? (
-            <div className="hidden h-6 text-xl font-semibold tracking-[0.14em] text-stone-800 uppercase sm:block dark:text-stone-100">
-              {siteMetadata.headerTitle}
-            </div>
-          ) : (
-            siteMetadata.headerTitle
-          )}
+        <div className="flex items-baseline gap-2">
+          <span
+            style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
+            className="text-xl leading-none text-stone-800 sm:text-2xl dark:text-stone-100"
+          >
+            DongOk
+          </span>
+          <span
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            className="text-[9px] tracking-[0.1em] text-stone-500 uppercase dark:text-stone-400"
+          >
+            Seo
+          </span>
         </div>
       </Link>
       <div className="flex items-center space-x-4 leading-5 sm:-mr-6 sm:space-x-6">
@@ -38,7 +40,7 @@ const Header = () => {
               <Link
                 key={link.title}
                 href={link.href}
-                className="hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 m-1 border-b border-transparent pb-1 text-sm font-medium tracking-[0.18em] text-stone-700 uppercase transition dark:text-stone-200"
+                className="hover:text-accent dark:hover:text-accent m-1 pb-1 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300"
               >
                 {link.title}
               </Link>

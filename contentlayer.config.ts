@@ -109,6 +109,8 @@ export const Blog = defineDocumentType(() => ({
     layout: { type: 'string' },
     bibliography: { type: 'string' },
     canonicalUrl: { type: 'string' },
+    // Design Handoff — category for filtering/coloring (quant | infra | japan | misc)
+    category: { type: 'string', default: 'misc' },
   },
   computedFields: {
     ...computedFields,

@@ -1,0 +1,159 @@
+---
+title: '내가 수동 매매하는 봇 운영자라면 — 거래소 실현손익 기준 일일 PnL 자동 reconciliation'
+date: 2026-04-26
+tags: [quantitative-trading, python, binance, risk-management, reconciliation, algorithm]
+summary: "오전에 자정 리셋 버그를 잡으면서 '남은 숙제'로 적어뒀던 거래소-봇 PnL reconciliation을, 그 자리에서 바로 구현했다. 단 자동 보정(AAB) 방향으로 간 이유는 내가 종종 수동 매매를 하기 때문이고, 그 결정에 따라 안전장치 다섯 개를 함께 깔았다."
+category: quant
+---
+
+## 같은 날 오후 — 남은 숙제 #2를 바로 잡다
+
+[오전에 쓴 자정 리셋 버그 글](./2026-04-26-daily-pnl-midnight-reset-bug)의 "남은 숙제" 섹션에 이런 항목이 있었다.
+
+> 거래소 잔고 기준 실제 손익과 봇이 기록한 `_daily_pnl`의 일치 여부 정기 점검 로직(예: 아침마다 reconciliation)
+
+오전 디버깅이 끝나고 봇이 정상 매매로 돌아간 뒤, 이 항목이 단순한 "있으면 좋은 것"이 아니라는 걸 깨달았다. **나는 봇 외에 종종 수동 매매를 한다.** 그 손익은 봇의 `_daily_pnl`에 잡히지 않고, 그러면 봇이 적용하는 일일 손실 한도가 거래소 실제 상황과 어긋난다.
+
+수동으로 -30 USDT 손실을 봤는데 봇은 자기 매매 기준으로 +0 USDT라고 알면, 봇은 평소처럼 신규 진입을 한다. 정작 계좌 입장에서는 한도를 한참 넘긴 상태인데 — 안전장치가 안전을 못 지키는 셈이다.
+
+## 결정: AAB
+
+세 가지 핵심 결정에서 이렇게 갔다.
+
+| #   | 결정             | 선택                                                                  |
+| --- | ---------------- | --------------------------------------------------------------------- |
+| 1   | 비교 시간 윈도우 | **A. KST 자정 기준** (봇 `_daily_pnl` 리셋 기준과 동일)               |
+| 2   | 주기             | **A. 매시 정각 KST cron** (1시간 안에 발견·복구)                      |
+| 3   | 불일치 시 처리   | **B. 자동 보정** (`_daily_pnl`을 거래소 값으로 덮어씀) + Discord 알림 |
+
+A/A/A(경고만)가 가장 안전한 기본값이지만, 수동 매매가 일상에 들어 있는 운영자에게는 의미가 없다. 매시간 Discord 경고만 받고 결국 손으로 봇 `_daily_pnl`을 맞춰야 한다면, 그건 자동화가 아니다. 그래서 자동 보정으로 갔다.
+
+대신 **자동 보정의 위험**(API가 잘못된 값을 반환하면 봇 상태를 망친다)을 알고 있으므로, 안전장치를 같이 깔았다.
+
+## 안전장치 5가지
+
+```python
+PNL_RECONCILE_THRESHOLD_USDT: float = 0.5
+
+def _reconcile_daily_pnl(self) -> None:
+    if self.settings.is_paper_trading():
+        return                                  # ① paper 모드 skip
+
+    self._reset_daily_pnl_if_needed()          # 날짜 경계 동기화 우선
+
+    offset_hours = getattr(self.settings, "timezone_offset", 9)
+    local_tz = timezone(timedelta(hours=offset_hours))
+    now_local = datetime.now(local_tz)
+    midnight_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_ms = int(midnight_local.timestamp() * 1000)
+
+    exchange_pnl = self.client.get_realized_pnl_since(start_ms)
+    if exchange_pnl is None:
+        return                                  # ② API 실패 → 보정 skip
+
+    diff = exchange_pnl - self._daily_pnl
+    if abs(diff) < self.PNL_RECONCILE_THRESHOLD_USDT:
+        logger.info(f"PnL reconciliation OK | 봇={self._daily_pnl:+.2f} 거래소={exchange_pnl:+.2f}")
+        return                                  # ③ 임계값 미만 → 노이즈로 간주
+
+    old_pnl = self._daily_pnl
+    self._daily_pnl = exchange_pnl              # ④ 양방향 자동 보정
+    logger.warning(f"PnL 자동 보정: {old_pnl:+.2f} → {exchange_pnl:+.2f} USDT (차이 {diff:+.2f})")
+    try:
+        notify_pnl_mismatch(bot_pnl=old_pnl, exchange_pnl=exchange_pnl, diff=diff)  # ⑤ Discord
+    except Exception as exc:
+        logger.warning(f"PnL 보정 Discord 알림 실패: {exc}")
+```
+
+다섯 개 한 줄 정리:
+
+| #   | 안전장치        | 이유                                                                                         |
+| --- | --------------- | -------------------------------------------------------------------------------------------- |
+| ①   | paper 모드 skip | 페이퍼 트레이딩은 거래소에 실제 주문이 안 가니 reconciliation 의미 없음                      |
+| ②   | API 실패 → skip | 거래소가 일시 다운/타임아웃일 때 봇 `_daily_pnl`을 0이나 None으로 덮으면 안전장치가 무력화됨 |
+| ③   | 임계값 0.5 USDT | 펀딩비/수수료 미세 차이로 매시간 false alarm 나는 걸 방지                                    |
+| ④   | 양방향 보정     | 거래소가 더 손실이면 한도 차단 강화, 더 이익이면 매매 재개 — 둘 다 정확성 향상               |
+| ⑤   | Discord 알림    | 자동 보정이 일어났다는 사실 자체를 운영자가 추적 가능                                        |
+
+## KST vs UTC — 흔한 함정
+
+봇은 `date.today()` 기반으로 자정 리셋한다. 이건 시스템 로컬 타임존 = KST다. 반면 바이낸스 API는 UTC ms를 받는다. 그래서 reconciliation 윈도우를 정의할 때 **KST 자정의 UTC ms 타임스탬프**를 직접 계산해야 한다.
+
+```python
+local_tz = timezone(timedelta(hours=9))  # KST
+now_local = datetime.now(local_tz)
+midnight_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+start_ms = int(midnight_local.timestamp() * 1000)
+```
+
+`datetime.timestamp()`은 timezone-aware 객체에 대해 자동으로 UTC epoch ms로 변환해준다. 이걸로 "KST 자정"이 정확히 "어제 UTC 15:00"으로 매핑된다. `pytz`나 `zoneinfo` 같은 외부 의존성 없이 표준 라이브러리만으로 처리 가능.
+
+`settings.timezone_offset`(.env에서 시간대 설정)를 그대로 사용했기 때문에, 만약 운영 환경이 다른 타임존이어도 동일한 코드가 동작한다.
+
+## 스케줄링: 시작 직후 1회 + 매시 정각
+
+```python
+# main_futures.py — 봇 시작 직후 1회 (재시작 시 누락된 손익 복구)
+if not settings.is_paper_trading():
+    try:
+        _trader._reconcile_daily_pnl()
+    except Exception as exc:
+        logger.warning(f"초기 PnL reconciliation 실패: {exc}")
+
+# 매시 정각 KST cron
+_scheduler.add_job(
+    _trader._reconcile_daily_pnl,
+    trigger=CronTrigger(minute=0, timezone="Asia/Seoul"),
+    id="pnl_reconciliation",
+    misfire_grace_time=300,
+    coalesce=True,
+)
+```
+
+봇 시작 직후 1회를 넣은 이유는 **재시작 = 한도 우회**라는 오전의 교훈 때문이다. `_daily_pnl=0`으로 시작해도 즉시 거래소 실제 값으로 동기화되니까 재시작 직후에도 한도가 정상 동작한다.
+
+매시 정각 KST는 운영 부담이 없는 주기다. 1시간에 income API 1회 = 무료 weight 한도 안. 자정 직후 첫 cron(01:00 KST)은 새 윈도우(0~1시간)의 손익을 검증하므로 "봇이 잘 리셋됐는지"도 같이 검증된다.
+
+## 배포 + 즉시 검증
+
+```bash
+git push origin main
+ssh home "cd ~/project/sdo_auto_trader_crypto && git pull && bash start.sh"
+```
+
+재시작 직후 로그.
+
+```
+2026-04-26 00:37:36 | INFO | core.futures_trader:599 -
+  PnL reconciliation OK | 봇=+0.00 거래소=+0.00 차이=+0.00
+2026-04-26 00:37:36 | INFO | __main__:143 - PnL reconciliation: 매시 정각 KST 실행 예약
+```
+
+KST 자정 직후라 둘 다 0이라 차이도 0. 임계값 미만이라 보정 안 일어남. cron 등록 확인. 정상.
+
+## 왜 #1(DB 영속화)는 안 잡았나
+
+오전 글의 "남은 숙제" #1은 `_daily_pnl`을 DB에 영속화하는 작업이었다. 의도적으로 안 했다. 이유는 본인 운영 패턴에 있다.
+
+> "1번은 거의 내가 버그없으면 안해"
+
+봇 재시작은 내 경우 **버그 수정 배포** 때만 일어난다. 일상적으로 자주 재시작하지 않는다. 그러면 `_daily_pnl=0` 초기화로 인한 한도 우회 위험은 사실상 reconciliation으로 1시간 안에 자동 복구된다 — DB 영속화 없이도 충분히 커버된다.
+
+운영 패턴 모르는 채로 모든 안전장치를 다 쌓는 건 과한 엔지니어링이다. **수동 매매를 한다 → 자동 보정 필요 / 봇 재시작이 드물다 → DB 영속화는 후순위**, 이게 내 패턴에 맞는 우선순위였다.
+
+## 배운 점
+
+**기본값은 안전, 결정은 운영자에게.**
+A/A/A가 일반적 권장이라도, 결정 셋(윈도우/주기/처리)을 운영자에게 묻고 운영자 패턴에 맞게 골라야 진짜 도움이 되는 자동화가 된다. "수동 매매하니까 AAB로 가자"는 1초의 자기 인식이 시스템 설계를 바꿨다.
+
+**자동 보정에는 안전장치 다섯 개가 따라온다.**
+"자동으로 고침"은 매력적이지만, 잘못된 입력으로 봇 상태를 망칠 위험을 같이 안는다. paper 모드 skip / API 실패 skip / 임계값 / 양방향 / 알림 — 이 다섯 개 없는 자동 보정은 안전장치가 아니라 새로운 버그 소스다.
+
+**TODO는 같은 날 잡을 수도 있다.**
+오전에 적은 "남은 숙제"가 오후에 끝났다. 이게 가능한 이유는 ① TODO가 1줄짜리 추상이 아니라 구체적 위치(`grep _daily_pnl`)와 함께 적혀 있었고, ② 같은 날이라 컨텍스트가 머리에 남아 있었기 때문이다. TODO를 다음 주로 미루지 말고, 가능하면 **컨텍스트가 살아있을 때 처리**하자.
+
+## 다음
+
+남은 #3 — `risk_manager.py`의 `RiskManager`와 `futures_trader.py`의 자체 PnL 추적을 하나로 통합하는 리팩토링이 남았다. 이건 운영 안정 후 별도로 가져갈 예정. 지금 당장은 reconciliation이 두 파일 사이의 비대칭을 우회하고 있어 급한 불은 꺼졌다.
+
+내일 01:00 KST에 첫 정시 cron이 도는지, 그리고 며칠 안에 수동 매매를 하나 일부러 넣어 자동 보정 + Discord 알림 동작을 실측해보면 된다. 운영은 결국 "검증할 수 있는 자동화"의 누적이다.

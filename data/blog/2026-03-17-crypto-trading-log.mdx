@@ -1,33 +1,42 @@
 ---
-title: "자동매매 일지 — 2026-03-17 (SOLUSDT 결합 전략)"
-date: "2026-03-17"
-tags: ["quantitative-trading", "python", "binance", "algorithm", "sdo-auto-trader", "combination-strategy"]
-summary: "SOLUSDT 결합 전략(SDO v2 + RSI + Bollinger) 실거래. 4회 진입, 손절 3회·익절 1회, 일일 순손익 약 -23 USDT."
+title: '자동매매 일지 — 2026-03-17 (SOLUSDT 결합 전략)'
+date: '2026-03-17'
+tags:
+  [
+    'quantitative-trading',
+    'python',
+    'binance',
+    'algorithm',
+    'sdo-auto-trader',
+    'combination-strategy',
+  ]
+summary: 'SOLUSDT 결합 전략(SDO v2 + RSI + Bollinger) 실거래. 4회 진입, 손절 3회·익절 1회, 일일 순손익 약 -23 USDT.'
+category: quant
 ---
 
 ## 요약
 
-| 항목 | 내용 |
-|------|------|
-| **전략** | combination (SDO v2 + RSI + Bollinger Bands) |
-| **심볼** | SOLUSDT |
-| **모드** | LIVE (실거래) |
-| **레버리지** | x30, 마진 타입 ISOLATED |
-| **손절 / 익절** | -30% / +30% (마진 대비) |
-| **일일 순손익** | **약 -23.09 USDT** (손절 3회, 익절 1회) |
+| 항목            | 내용                                         |
+| --------------- | -------------------------------------------- |
+| **전략**        | combination (SDO v2 + RSI + Bollinger Bands) |
+| **심볼**        | SOLUSDT                                      |
+| **모드**        | LIVE (실거래)                                |
+| **레버리지**    | x30, 마진 타입 ISOLATED                      |
+| **손절 / 익절** | -30% / +30% (마진 대비)                      |
+| **일일 순손익** | **약 -23.09 USDT** (손절 3회, 익절 1회)      |
 
 ## 거래 내역
 
-1. **04:16** — SHORT 진입 10.86 SOL @ 95.19  
+1. **04:16** — SHORT 진입 10.86 SOL @ 95.19
    - **06:37** 손절 @ 96.51 → **-14.34 USDT** (-1.39%)
 
-2. **06:59** — SHORT 진입 7.09 SOL @ 96.19  
+2. **06:59** — SHORT 진입 7.09 SOL @ 96.19
    - **07:07** 손절 @ 97.27 → **-7.66 USDT** (-1.12%)
 
-3. **07:17** — SHORT 진입 5.07 SOL @ 97.15  
+3. **07:17** — SHORT 진입 5.07 SOL @ 97.15
    - **08:02** 익절 @ 96.16 → **+5.02 USDT** (+1.02%)
 
-4. **13:01** — LONG 진입 6.36 SOL @ 94.16 (Bollinger 하단 반등 신호)  
+4. **13:01** — LONG 진입 6.36 SOL @ 94.16 (Bollinger 하단 반등 신호)
    - **13:41** 손절 @ 93.20 → **-6.11 USDT** (-1.02%)
 
 ## 종가·운영

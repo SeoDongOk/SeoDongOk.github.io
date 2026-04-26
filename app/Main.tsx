@@ -126,8 +126,7 @@ export default function Home({ posts }) {
                 </em>
               </h1>
               <p className="mt-5 max-w-[520px] text-[15.5px] leading-[1.8] text-stone-600 dark:text-stone-400">
-                퀀트 봇을 만들고, 서버를 고치고, 일본어를 외웁니다. 그 과정에서 마주친 막힘과 배움을
-                여기에 적어둡니다.
+                3년차 개발자 서동옥 블로그입니다.
               </p>
               <HeroLanguageSwitch />
               <div className="mt-8 flex flex-wrap gap-3">

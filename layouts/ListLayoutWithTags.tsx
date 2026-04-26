@@ -111,20 +111,26 @@ export default function ListLayoutWithTags({
 
   return (
     <div className="space-y-10 pt-8">
-      <section className="ambient-panel overflow-hidden rounded-[2rem] px-6 py-8 md:px-10 md:py-10">
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.9fr)] lg:items-end">
+      <section className="ambient-panel overflow-hidden rounded-2xl px-6 py-7 md:px-8 md:py-8">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(240px,0.7fr)] lg:items-end">
           <div className="space-y-4">
-            <p className="text-xs tracking-[0.32em] text-stone-500 uppercase dark:text-stone-200">
+            <p
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              className="text-[11px] tracking-[0.1em] text-stone-500 uppercase dark:text-stone-400"
+            >
               {pathname.startsWith('/tags/') ? common.tags : common.posts}
             </p>
-            <h1 className="max-w-4xl text-3xl leading-tight font-bold tracking-tight text-stone-900 md:text-5xl dark:text-stone-100">
+            <h1
+              style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
+              className="text-[28px] leading-[1.2] text-stone-900 sm:text-4xl md:text-[42px] dark:text-stone-100"
+            >
               {displayTitle}
             </h1>
-            <p className="max-w-2xl text-base leading-7 text-stone-600 dark:text-stone-100">
+            <p className="max-w-2xl text-[15.5px] leading-[1.8] text-stone-600 dark:text-stone-400">
               {introText}
             </p>
           </div>
-          <div className="ambient-surface rounded-[1.5rem] p-5">
+          <div className="ambient-surface rounded-xl p-5">
             <p className="text-xs tracking-[0.26em] text-stone-500 uppercase dark:text-stone-200">
               {searchValue ? common.searchArticles : common.posts}
             </p>
@@ -164,27 +170,23 @@ export default function ListLayoutWithTags({
 
       <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
         <aside className="lg:sticky lg:top-24 lg:w-[280px] lg:min-w-[280px]">
-          <div className="ambient-surface overflow-hidden rounded-[1.5rem]">
+          <div className="ambient-surface overflow-hidden rounded-xl">
             <div className="border-b border-stone-900/10 px-6 py-4 dark:border-stone-100/8">
               <p className="text-xs tracking-[0.24em] text-stone-500 uppercase dark:text-stone-200">
                 {common.tags}
               </p>
             </div>
             <div className="max-h-[70vh] overflow-auto px-4 py-4">
-              <div className="mb-3">
-                {pathname.startsWith('/blog') ? (
-                  <h3 className="border-primary-700/20 bg-primary-100 text-primary-700 dark:border-primary-300/20 dark:bg-primary-950/30 dark:text-primary-200 inline-flex rounded-full border px-4 py-2 text-xs font-semibold tracking-[0.18em] uppercase">
-                    {common.allPosts}
-                  </h3>
-                ) : (
+              {!pathname.startsWith('/blog') && (
+                <div className="mb-3">
                   <Link
                     href={`/blog`}
                     className="hover:border-primary-500 hover:text-primary-700 dark:hover:text-primary-300 inline-flex rounded-full border border-stone-900/10 px-4 py-2 text-xs font-semibold tracking-[0.18em] text-stone-700 uppercase transition dark:border-stone-100/10 dark:text-stone-100"
                   >
                     {common.allPosts}
                   </Link>
-                )}
-              </div>
+                </div>
+              )}
               <ul className="space-y-2">
                 {sortedTags.map((t) => {
                   const isActive = activeTag === slug(t)
@@ -213,20 +215,16 @@ export default function ListLayoutWithTags({
 
         <div className="min-w-0 flex-1">
           <div className="mb-6 flex gap-3 overflow-x-auto pb-1 lg:hidden">
-            <div className="shrink-0">
-              {pathname.startsWith('/blog') ? (
-                <h3 className="border-primary-700/20 bg-primary-100 text-primary-700 dark:border-primary-300/20 dark:bg-primary-950/30 dark:text-primary-200 inline-flex rounded-full border px-4 py-2 text-xs font-semibold tracking-[0.18em] uppercase">
-                  {common.allPosts}
-                </h3>
-              ) : (
+            {!pathname.startsWith('/blog') && (
+              <div className="shrink-0">
                 <Link
                   href={`/blog`}
                   className="inline-flex rounded-full border border-stone-900/10 px-4 py-2 text-xs font-semibold tracking-[0.18em] text-stone-700 uppercase dark:border-stone-100/10 dark:text-stone-100"
                 >
                   {common.allPosts}
                 </Link>
-              )}
-            </div>
+              </div>
+            )}
             {sortedTags.slice(0, 12).map((t) => {
               const isActive = activeTag === slug(t)
               return isActive ? (
@@ -251,7 +249,7 @@ export default function ListLayoutWithTags({
 
           <ul className="space-y-5">
             {!filteredPosts.length && (
-              <li className="ambient-surface rounded-[1.5rem] px-6 py-8 text-stone-600 dark:text-stone-100">
+              <li className="ambient-surface rounded-xl px-6 py-8 text-stone-600 dark:text-stone-100">
                 {common.noPostsFound}
               </li>
             )}
@@ -259,7 +257,7 @@ export default function ListLayoutWithTags({
               const { path, date, title, summary, tags } = post
               return (
                 <li key={path}>
-                  <article className="ambient-surface rounded-[1.5rem] px-6 py-6 md:px-8 md:py-7">
+                  <article className="ambient-surface rounded-xl px-6 py-6 md:px-8 md:py-7">
                     <div className="space-y-4 xl:grid xl:grid-cols-[160px_minmax(0,1fr)] xl:items-start xl:gap-8 xl:space-y-0">
                       <dl>
                         <dt className="sr-only">{common.publishedOn}</dt>

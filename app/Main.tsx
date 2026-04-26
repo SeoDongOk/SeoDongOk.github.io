@@ -50,7 +50,7 @@ const homeCopy: Record<
     projectCta: 'View Projects',
     snapshot: 'Snapshot',
     notes: 'Notes',
-    notesDescription: '관심 있는 분야와 진행 중인 작업을 계속 정리하고 있습니다.',
+    notesDescription: '글로 적어두면 같은 곳에서 다시 막히지 않습니다.',
     recentLabel: 'Recent Updates',
     recentTitle: '최근 업데이트',
     recentDescription: '최근에 추가한 글과 작업 기록입니다.',
@@ -67,7 +67,7 @@ const homeCopy: Record<
     projectCta: 'View Projects',
     snapshot: 'Snapshot',
     notes: 'Notes',
-    notesDescription: '関心のある分野と進行中の作業を継続的に整理しています。',
+    notesDescription: '書き留めておけば、同じ場所でもう一度詰まらなくて済みます。',
     recentLabel: 'Recent Updates',
     recentTitle: '最近の更新',
     recentDescription: '最近追加した記事と作業記録です。',
@@ -84,7 +84,7 @@ const homeCopy: Record<
     projectCta: 'View Projects',
     snapshot: 'Snapshot',
     notes: 'Notes',
-    notesDescription: 'Ongoing interests and current work are updated here over time.',
+    notesDescription: 'Writing it down keeps me from getting stuck at the same spot twice.',
     recentLabel: 'Recent Updates',
     recentTitle: 'Recent Updates',
     recentDescription: 'Recent posts and working notes collected here.',
@@ -106,8 +106,8 @@ export default function Home({ posts }) {
   return (
     <>
       <div className="space-y-10 pt-8">
-        <section className="ambient-panel overflow-hidden rounded-[2rem] px-6 py-10 md:px-10 md:py-14">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.8fr)]">
+        <section className="ambient-panel overflow-hidden rounded-2xl px-6 py-8 md:px-8 md:py-10">
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,1.5fr)_minmax(240px,0.7fr)]">
             <div>
               <p
                 style={{ fontFamily: "'JetBrains Mono', monospace" }}
@@ -146,30 +146,30 @@ export default function Home({ posts }) {
               </div>
             </div>
             <div className="grid gap-4 self-end">
-              <div className="ambient-surface rounded-[1.5rem] p-5">
-                <p className="text-xs tracking-[0.26em] text-stone-500 uppercase dark:text-stone-200">
+              <div className="ambient-surface rounded-xl p-5">
+                <p className="text-xs tracking-[0.26em] text-stone-500 uppercase dark:text-stone-400">
                   {copy.snapshot}
                 </p>
                 <dl className="mt-4 grid grid-cols-2 gap-4">
                   <div>
-                    <dt className="text-xs text-stone-500 dark:text-stone-200">{copy.posts}</dt>
+                    <dt className="text-xs text-stone-500 dark:text-stone-400">{copy.posts}</dt>
                     <dd className="mt-1 text-3xl font-semibold text-stone-900 dark:text-stone-100">
                       {posts.length}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-stone-500 dark:text-stone-200">{copy.tags}</dt>
+                    <dt className="text-xs text-stone-500 dark:text-stone-400">{copy.tags}</dt>
                     <dd className="mt-1 text-3xl font-semibold text-stone-900 dark:text-stone-100">
                       {tagCount}
                     </dd>
                   </div>
                 </dl>
               </div>
-              <div className="ambient-surface rounded-[1.5rem] p-5">
-                <p className="text-xs tracking-[0.26em] text-stone-500 uppercase dark:text-stone-200">
+              <div className="ambient-surface rounded-xl p-5">
+                <p className="text-xs tracking-[0.26em] text-stone-500 uppercase dark:text-stone-400">
                   {copy.notes}
                 </p>
-                <p className="mt-3 text-sm leading-7 text-stone-600 dark:text-stone-100">
+                <p className="mt-3 text-[15.5px] leading-[1.8] text-stone-600 dark:text-stone-400">
                   {copy.notesDescription}
                 </p>
               </div>
@@ -179,7 +179,7 @@ export default function Home({ posts }) {
 
         <div className="divide-y divide-stone-300/70 dark:divide-stone-700/70">
           <div className="space-y-3 pb-8">
-            <p className="text-xs tracking-[0.3em] text-stone-500 uppercase dark:text-stone-200">
+            <p className="text-xs tracking-[0.3em] text-stone-500 uppercase dark:text-stone-400">
               {copy.recentLabel}
             </p>
             <h2 className="text-3xl leading-tight font-bold tracking-tight text-stone-900 md:text-5xl dark:text-stone-100">

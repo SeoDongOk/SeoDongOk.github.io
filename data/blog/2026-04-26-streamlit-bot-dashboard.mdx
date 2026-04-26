@@ -1,0 +1,236 @@
+---
+title: '같은 날 세 번째 글 — 봇 운영 대시보드는 Streamlit 한 페이지면 충분했다'
+date: 2026-04-26
+tags: [quantitative-trading, python, streamlit, dashboard, raspberry-pi, devops]
+summary: '오전 자정 리셋 버그, 오후 reconciliation 자동 보정에 이어, 저녁에는 운영 대시보드를 라즈베리파이에 띄웠다. SQLite read-only + 로그 파서 패턴으로 봇을 한 줄도 안 건드리고 4개 위젯 — 봇 헬스, 일일 한도 게이지, reconciliation 이력, 거래 이력 — 을 200줄짜리 Streamlit 한 파일로 정리한 과정과, 첫 배포에서 만난 두 개의 로그 파싱 버그.'
+category: quant
+---
+
+## 같은 날, 세 번째
+
+오늘 두 번 글을 썼다. [자정 리셋 버그](./2026-04-26-daily-pnl-midnight-reset-bug)와 [reconciliation 자동 보정](./2026-04-26-pnl-reconciliation-manual-trade-aware). 그러고 나서 봇이 정상 매매로 돌아간 뒤 운영 모니터링 도구가 부족하다는 게 분명해졌다.
+
+지금까지는 로그 tail + Discord 알림 + 일일 요약 블로그가 전부였다. 이걸로도 일상은 돌아갔지만, "지금 한도 사용률 몇 %?", "WS는 살아있나?", "오늘 reconciliation은 정상인가?" 를 한 눈에 보려면 매번 ssh로 grep해야 했다.
+
+마침 데이터 인프라는 다 있다 — SQLite `trades.db`, 로그 파일, `bot.pid`. 부족한 건 "보여주기" 한 겹뿐. **Streamlit 한 페이지면 충분**해 보였고, 실제로 그랬다.
+
+## 결정: 라즈베리에 별도 폴더, 봇 레포는 한 줄도 안 건드림
+
+봇 레포(`sdo_auto_trader_crypto`)에 dashboard 폴더를 추가하는 대신, 같은 라즈베리의 옆 폴더로 분리했다.
+
+```
+/home/seodong-og/project/
+├── sdo_auto_trader_crypto/   ← 봇 (변경 X)
+├── sdo_trader_dashboard/     ← 대시보드 (이번에 신설)
+└── ...
+```
+
+이렇게 한 이유:
+
+1. **봇 코드 동결**: 운영 중인 거래 봇에 대시보드용 의존성이 섞이면 봇 안정성에 부담. 대시보드 venv는 봇 venv를 **공유만** 한다 (run.sh 첫 실행 시 `pip install streamlit`).
+2. **read-only 보장**: 별도 프로세스가 SQLite를 `mode=ro`로 열고 로그 파일은 읽기만. 봇 운영에 영향 0.
+3. **분리 배포 가능**: 대시보드 만지다 깨져도 봇은 그대로 돈다.
+
+## 데이터 액세스: DB + 로그 파서 + .env 화이트리스트
+
+봇이 가진 정보 중 어떤 게 어디에 있나 정리하니 이렇게 됐다.
+
+| 위젯                   | 데이터 위치               | 접근 방식                 |
+| ---------------------- | ------------------------- | ------------------------- |
+| 활성 포지션            | `active_positions` 테이블 | DB read-only              |
+| 거래 이력 / 누적 PnL   | `trade_history` 테이블    | DB read-only              |
+| 일일 손실 한도 게이지  | 봇 인메모리 `_daily_pnl`  | **로그 파싱**             |
+| Reconciliation 이력    | 로그만 (DB에 없음)        | **로그 파싱**             |
+| 봇 헬스 (PID/WS/cycle) | `bot.pid` + 로그          | 파일시스템 + 로그         |
+| 한도 % / 잔액          | `.env` 설정               | `.env` 화이트리스트 4개만 |
+
+봇 인메모리 상태(예: `_daily_pnl`)를 DB에 영속화할 수도 있었지만, 그건 봇 코드 수정이 필요한 작업이라 이번엔 로그 파싱으로 우회했다. 운영하다 진짜 필요해지면 그때 봇에 추가하기로.
+
+## SQLite read-only 트릭
+
+```python
+def _connect_ro() -> sqlite3.Connection:
+    uri = f"file:{DB_PATH}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
+    conn.row_factory = sqlite3.Row
+    return conn
+```
+
+`uri=True` + `mode=ro`. 이게 핵심이다. 대시보드가 실수로라도 INSERT/UPDATE를 호출하면 SQLite 단에서 거부한다 — 봇 DB를 보호하는 안전장치가 코드 한 줄로 끝난다.
+
+## .env 화이트리스트 — 키 누출 방지
+
+`.env`를 읽긴 해야 했다 (한도 % 표시용). 그러나 같은 파일에 `BINANCE_API_KEY`, `BINANCE_SECRET_KEY`, `DISCORD_BOT_TOKEN`이 같이 있다. 모든 줄을 dict로 읽어버리면 메모리에 들어오고, 실수로 어디 표시될 위험이 있다.
+
+그래서 **명시적 화이트리스트**로 막았다.
+
+```python
+def fetch_daily_loss_limit_config() -> dict:
+    config = {"max_daily_loss_pct": 5.0, "paper_balance": 50.0, ...}
+    for line in env_path.read_text(...).splitlines():
+        k, v = line.split("=", 1)
+        if k == "MAX_DAILY_LOSS_PCT":
+            config["max_daily_loss_pct"] = float(v)
+        elif k == "PAPER_BALANCE":
+            ...
+        # API_KEY/SECRET/TOKEN 등은 그대로 무시
+```
+
+이 패턴이면 `.env`가 어떻게 커져도 대시보드 메모리에는 4개 설정값만 들어온다. 사후 보안 검증에서 4채널(코드 / 로그 / DB / HTML 응답) 모두 키-like 패턴 0건 — 문제 없음 확인.
+
+## 봇 venv 공유 + 자동 streamlit 설치 — run.sh
+
+```bash
+BOT_VENV="/home/seodong-og/project/sdo_auto_trader_crypto/venv/bin/activate"
+source "$BOT_VENV"
+
+if ! python -c "import streamlit" >/dev/null 2>&1; then
+    pip install -q streamlit pandas
+fi
+
+nohup streamlit run app.py \
+    --server.address 0.0.0.0 \
+    --server.port 8501 \
+    --server.headless true \
+    --browser.gatherUsageStats false \
+    >> dashboard.log 2>&1 &
+```
+
+봇 venv를 그대로 쓰니 라즈베리에 venv가 두 개 안 생긴다 (SD카드 용량/메모리 절약). 첫 실행 시 streamlit이 자동으로 deps 설치되고, 그 다음부터는 `bash run.sh` 한 줄로 재시작.
+
+## 첫 배포에서 만난 두 개의 버그
+
+배포 후 사용자가 화면을 봤다. 결과: **WS 둘 다 끊김**, **마지막 사이클 감지 안됨**. 그런데 봇은 멀쩡히 돌고 있다.
+
+### 버그 1 — "끝에서 N줄만 읽기"의 함정
+
+WS 상태를 판단하는 정규식은 정확했다.
+
+```python
+user_ws_ok = re.compile(r"User Data Stream WS\s*활성화|WS 연결 성공.*Futures User Data")
+```
+
+봇 로그에는 분명히 매치되는 줄이 있었다 (`line 281`). 그런데 끊김으로 표시. 이유는:
+
+```python
+def _read_recent_log_lines(max_lines: int = 5000) -> list[str]:
+    # 끝에서 max_lines만 가져옴
+```
+
+봇이 시작한 시점(00:37:36)에 WS 활성화 메시지가 한 번 찍히고 끝. 그 후 6시간 동안 매 분 cycle 로그가 누적됐고, 끝에서 5000줄만 보면 시작 시점 메시지는 윈도우 밖으로 밀려나 있었다.
+
+**고친 방향**: 풀 스캔 + 시간순 가장 최근 이벤트.
+
+```python
+for line in lines:
+    if user_ws_bad.search(line):
+        user_ws_state = False
+    elif user_ws_ok.search(line):
+        user_ws_state = True
+```
+
+오늘분 `trader_*.log`는 통상 1MB 이내라 `readlines()` 부담은 무시할 수준. 활성화/끊김 이벤트가 모두 잡히고, 마지막 이벤트가 결과로 남는다. 봇이 종료/재시작되면 "정지"가 더 최근이었다가 곧 "활성화"로 덮이는 식으로 자연 동작.
+
+### 버그 2 — 상태 의존 키워드
+
+"마지막 사이클 시각"은 `[대기중]` 키워드로 잡으려 했다.
+
+```python
+cycle_re = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*\[대기중\]")
+```
+
+함정: `[대기중]`은 **포지션이 없을 때만** 찍힌다. 포지션이 있으면 `📉 [BTCUSDT] SHORT | 미실현=...` 같은 다른 라인이 찍힌다. 즉, 봇이 포지션을 잡고 있는 순간 마지막 사이클 감지가 갑자기 끊긴다.
+
+**고친 방향**: 봇이 살아있다는 가장 일반적인 증거 = 마지막 로그 라인의 timestamp.
+
+```python
+last_line_ts_re = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
+for line in reversed(lines):
+    m = last_line_ts_re.match(line)
+    if m:
+        last_cycle_at = datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S")
+        break
+```
+
+상태가 무엇이든 봇이 로그를 찍고 있으면 그게 cycle alive의 증거다. 가장 단순하고, 가장 견고하다.
+
+## "댓글이 뭐야 이거 필요없잖아"
+
+사용자 피드백 중 하나. 화면 어딘가에 한국어로 "댓글" 비슷한 게 보였다는데, 내 코드에는 그런 텍스트가 없었다. 추정 원인 둘:
+
+1. **`help=...` 메트릭 도움말 ?아이콘**: 한국어 OS locale에서 streamlit 자동 라벨이 어색하게 보였을 수도.
+2. **Streamlit 우상단 햄버거 메뉴**: "Report a bug" 같은 항목이 한국어로 변환되어 보였을 가능성.
+
+둘 다 일거에 정리:
+
+- `help=...` 모두 제거 (어드민 페이지에는 시각 노이즈가 적은 게 낫다)
+- `menu_items={}`로 햄버거 메뉴 비움
+
+이후 다시 본 사용자 피드백: "잘 진행하는 거 같네." 정확한 원인을 못 짚어도, **눈에 거슬리는 건 일단 다 빼고 다시 보여주기**가 효과적이었다.
+
+## 보안 점검 — 4채널 0건
+
+대시보드 띄우고 가장 마지막에 사용자가 물었다: "키 노출 없지?"
+
+당연히 점검한다.
+
+```bash
+# 1. 우리 코드
+grep -nE 'api_key|secret|TOKEN|password|webhook' app.py data_access.py run.sh
+# → 0건
+
+# 2. 봇 로그
+grep -inE 'api_key|secret_key|webhook|bot_token' trader_*.log
+# → 0건
+
+# 3. DB bot_state 테이블
+sqlite> SELECT key, substr(value, 1, 20) FROM bot_state;
+# → 0건 (키 관련 데이터 없음)
+
+# 4. Streamlit HTML 응답
+curl -s http://localhost:8501/ | grep -iE 'api_key|secret|token|password'
+# → 0건 (jsbundle 파일명 'space-separated-tokens.js'만 잡힘 — 무관)
+```
+
+키는 어디에도 없다. `.env` 파싱이 화이트리스트 4개로 제한된 효과가 검증으로 입증됐다.
+
+(별도 위험은 짚어뒀다 — 현재 0.0.0.0:8501이라 LAN에 운영 정보가 노출된다. 키는 아니라 사용자가 OK라고 판단했고, 필요해지면 127.0.0.1 + SSH 터널만 사용하도록 한 줄 바꾸면 된다.)
+
+## 운영 검증 (오늘 10:19 KST 기준)
+
+| 항목                                    | 결과               |
+| --------------------------------------- | ------------------ |
+| PID 526533 (봇) / PID 531109 (대시보드) | 둘 다 alive        |
+| User Data WS / Market Data WS           | 둘 다 연결         |
+| 마지막 사이클                           | 10:19 KST (즉시)   |
+| 오늘 자정 리셋                          | -21.01 → -0.153 ✅ |
+| Reconciliation cron                     | 11회 정상 실행     |
+| 보안 4채널                              | 키 노출 0건        |
+
+핵심 4 위젯 모두 정상 동작. 추가 다듬기(다크 테마, 자동 새로고침 라이브러리)는 며칠 운영하면서 진짜 필요한 것만 가져오기로 했다 — 오버엔지니어링 회피.
+
+## 배운 점
+
+**"보여주기"만 분리하면 봇 코드는 안 건드려도 된다.**
+대시보드 = 봇의 부속이 아니라 별도 프로세스. 같은 venv를 공유하되 별도 폴더 / 별도 git 단위 / read-only 액세스. 이러면 대시보드 실험을 자유롭게 해도 봇은 영향 없다.
+
+**로그 파서는 "끝에서 N줄"보다 "풀 스캔 + 마지막 이벤트"가 견고하다.**
+시작 시점 1회 메시지(WS 활성화)를 놓치는 건 흔한 함정. 윈도우 크기 키우는 임시방편보다 패턴 자체를 바꾸는 게 수정 1번으로 끝난다.
+
+**상태 의존 키워드는 alive 체크에 부적합.**
+"[대기중]"이 보일 때만 봇이 살아있다고 판단하면, 포지션 잡고 있을 때 갑자기 죽은 봇처럼 보인다. "마지막 로그 라인 timestamp"처럼 상태와 무관한 신호를 찾아야 한다.
+
+**"눈에 거슬리는 건 일단 다 빼고 다시 보여주기"가 효과적이다.**
+원인을 정확히 못 짚어도, 사용자가 거슬려한 영역(`help=`, 햄버거 메뉴, 디프리케이션 경고)을 일단 다 정리하면 다음 라운드에서 진짜 문제만 남는다. 디버깅의 검색 공간을 좁히는 방법.
+
+**키 노출 점검은 코드 + 로그 + DB + 응답HTML 4채널이 기본.**
+한 군데만 보면 놓친다. 점검 자체를 2분짜리 grep 4번으로 자동화하면 새 페이지 띄울 때마다 재실행할 수 있다.
+
+## 다음
+
+- 며칠 운영 → 진짜 필요한 위젯/지표만 추가 (예측 추가 X)
+- 자동 새로고침은 `streamlit-autorefresh` 라이브러리로 (sleep+rerun은 사용자 인터랙션을 막음 — 첫 버전은 수동 새로고침으로 우회)
+- 다크 어드민 테마는 `.streamlit/config.toml` 한 줄
+- 봇 인메모리 상태(예: `_daily_pnl`)를 DB에 영속화하는 작업이 필요해질 시점 = 로그 파싱이 한계에 부딪히는 순간
+
+오늘 하루 정리하면 — **자정 리셋 버그 → reconciliation 자동 보정 → 운영 대시보드** 세 단계가 같은 흐름이었다. 모두 "봇이 보이지 않게 운영 안전을 깎아먹고 있던 것을 드러내기"였다. 디버깅 → 보강 → 가시화. 이 순서가 자연스러운 운영 성숙의 흐름이지 싶다.

@@ -1,0 +1,199 @@
+---
+title: '오늘 매매한 적 없는데 일일 손실 -21 USDT? — 자정 리셋 누락 버그와 누적 카운터 함정'
+date: 2026-04-26
+tags: [quantitative-trading, python, binance, risk-management, debugging, algorithm]
+summary: "라즈베리파이 봇이 며칠째 매매를 안 하길래 로그를 보니 '일일 손실 한도 초과'로 차단 중이었다. 그런데 오늘은 매매한 적이 없는데 왜? 추적해보니 _daily_pnl이 자정에 리셋되지 않는 코드 비대칭 문제였다. risk_manager에는 리셋 로직이 있는데 futures_trader에는 빠져 있었던 사연."
+category: quant
+---
+
+## "왜 매매를 안 하지?"가 출발점
+
+봇 상태가 궁금해서 라즈베리파이에 ssh로 붙어 로그를 봤다. 하루 종일 동일한 메시지만 반복되고 있었다.
+
+```
+2026-04-25 23:48:00 | WARNING  | core.futures_trader:580 -
+  일일 손실 한도 초과 (실현+미실현):
+  -21.01 USDT < -2.50 USDT | 실현=-21.01, 미실현=+0.00
+2026-04-25 23:48:00 | INFO     | core.futures_trader:1553 -
+  [대기중] 포지션 없음 | BTCUSDT=77,688 | ETHUSDT=2,317 | SOLUSDT=86.60
+```
+
+`-21.01 USDT` 손실이 `-2.50 USDT` 한도(잔액의 5%)를 초과해서 신규 진입이 차단된 상태였다. 한도의 약 8배를 넘긴 손실인데, **문제는 오늘 매매를 한 기억이 없다는 것**이었다.
+
+## 오늘 매매 흔적부터 검색
+
+```bash
+grep -E '청산|체결|진입|손익=|BUY|SELL' data/logs/trader_2026-04-25.log
+```
+
+→ **결과 0건**.
+
+매매가 정말로 없었다는 게 확인됐다. 그러면 이 -21.01 USDT는 어디서 온 거지? 어제(4-24) 로그를 뒤졌다.
+
+```
+2026-04-24 00:18:00 | INFO  | [실거래] SHORT 청산: BTCUSDT  손익=-3.50 USDT
+2026-04-24 00:18:01 | WARN  | 외부 청산 감지 (WS): BTCUSDT  손익=-3.17 USDT
+2026-04-24 02:02:00 | INFO  | [실거래] LONG  청산: SOLUSDT  손익=-9.81 USDT
+2026-04-24 02:03:00 | WARN  | 외부 청산 감지 (WS): SOLUSDT  손익=-10.34 USDT
+2026-04-23 13:51:00 | WARN  | 외부 청산 감지 (WS): SOLUSDT  손익=+5.81 USDT
+```
+
+합산: `+5.81 - 3.50 - 3.17 - 9.81 - 10.34 = -21.01 USDT`. 정확히 맞아떨어진다.
+
+> 잠깐 의심: BTC와 SOL 모두 "[실거래] 청산"과 "외부 청산 감지(WS)"가 1초~1분 차이로 두 번 찍혀 있다. 이중 카운팅 아닌가?
+
+가격이 다르기 때문에 같은 청산이 아니라 봇 자체 SL과 거래소 STOP_MARKET이 별도 체결된 두 건일 가능성이 높다. 거래소 잔고 기준으로 -21.01이 맞다는 것을 확인했고, **이 부분은 이중 카운팅이 아닌 실제 손실**이었다.
+
+## 진짜 문제: 자정에 리셋이 안 됨
+
+그럼 왜 어제 손실이 오늘까지 그대로 살아 있을까. `core/futures_trader.py`를 grep했다.
+
+```bash
+grep -n 'daily_pnl\|reset_daily' core/futures_trader.py core/risk_manager.py
+```
+
+- `core/futures_trader.py:94` → `self._daily_pnl: float = 0.0` (초기화만)
+- `core/futures_trader.py:465` → `self._daily_pnl += pnl` (외부 청산 누적)
+- `core/futures_trader.py:808` → `self._daily_pnl += pnl` (실거래 청산 누적)
+- `core/futures_trader.py:578` → 한도 체크
+- `core/risk_manager.py:31` → **`_reset_daily_pnl_if_needed()` 메서드** ✅
+
+비대칭이 보인다. `risk_manager.py`는 자정 리셋 로직을 가지고 있는데, `futures_trader.py`는 자체 `_daily_pnl`을 따로 관리하면서 그 리셋 메서드를 호출하지 않는다.
+
+`risk_manager.py`의 리셋 로직은 이렇게 생겼다.
+
+```python
+class RiskManager:
+    def __init__(self, settings: Settings):
+        self.daily_pnl: float = 0.0
+        self.daily_reset_date: date = date.today()
+
+    def _reset_daily_pnl_if_needed(self) -> None:
+        today = date.today()
+        if today != self.daily_reset_date:
+            logger.info(f"일일 손익 초기화: {self.daily_pnl:.2f} USDT")
+            self.daily_pnl = 0.0
+            self.daily_reset_date = today
+```
+
+`futures_trader.py`에는 이게 없다. 그래서 한 번 누적된 `_daily_pnl`은 봇이 재시작되기 전까지는 영원히 남는다.
+
+## 보너스 발견: WARNING 로그가 분당 3번
+
+같은 로그를 다시 보니 한 가지가 더 거슬렸다.
+
+```
+2026-04-25 23:48:00 | WARNING | 일일 손실 한도 초과 ...  (3번 반복)
+2026-04-25 23:48:00 | INFO    | [대기중] 포지션 없음 ...
+```
+
+매 분마다 정확히 3번 찍힌다. `_can_open_new_position()`이 BTC/ETH/SOL 3개 심볼 각각에서 호출되니까 그렇다. 동일 메시지인데 dedup 없이 출력하다 보니 로그가 부풀어 있었다.
+
+## 패치 3가지를 한 번에
+
+### 1. import에 `date` 추가
+
+```python
+# from datetime import datetime
+from datetime import date, datetime
+```
+
+### 2. `__init__`에 리셋 기준 날짜 + WARNING dedup 키
+
+```python
+self._positions: dict[str, FuturesPosition] = {}
+self._daily_pnl: float = 0.0
+self._daily_reset_date: date = date.today()      # 일일 손익 리셋 기준
+self._last_daily_loss_warn_minute: str = ""       # 분당 1회 dedup
+```
+
+### 3. 리셋 메서드 + 한도 체크 진입 시 호출 + WARNING dedup
+
+```python
+def _reset_daily_pnl_if_needed(self) -> None:
+    """날짜가 바뀌면 일일 실현 손익을 0으로 리셋."""
+    today = date.today()
+    if today != self._daily_reset_date:
+        logger.info(
+            f"일일 손익 초기화: {self._daily_pnl:+.2f} USDT "
+            f"({self._daily_reset_date} → {today})"
+        )
+        self._daily_pnl = 0.0
+        self._daily_reset_date = today
+
+def _can_open_new_position(self, symbol: str) -> bool:
+    # 날짜 변경 시 일일 실현 손익 자동 리셋
+    self._reset_daily_pnl_if_needed()
+
+    # ... 기존 체크 ...
+
+    if total_loss < -max_loss:
+        minute_key = datetime.now().strftime("%Y-%m-%d %H:%M")
+        if minute_key != self._last_daily_loss_warn_minute:
+            logger.warning(
+                f"일일 손실 한도 초과 (실현+미실현): "
+                f"{total_loss:+.2f} USDT < -{max_loss:.2f} USDT | "
+                f"실현={self._daily_pnl:+.2f}, 미실현={self._total_unrealized_pnl():+.2f}"
+            )
+            self._last_daily_loss_warn_minute = minute_key
+        return False
+```
+
+리셋을 `_can_open_new_position()` 진입부에 넣은 이유는, 어차피 한도 체크가 모든 신규 진입의 관문이라 자연스럽게 자정이 지나면 한 번은 호출된다. 별도 스케줄러나 타이머를 추가할 필요 없이 lazy하게 처리된다.
+
+WARNING dedup 키는 분 단위(`YYYY-MM-DD HH:MM`)로 잡았다. 분당 한 번만 찍히면 충분하고, 다음 분이 되면 키가 바뀌어 다시 출력된다.
+
+## 배포 + 재시작
+
+```bash
+# 로컬
+git add core/futures_trader.py
+git commit -m "fix: 일일 PnL 자정 자동 리셋 + 한도 초과 WARNING 분당 1회 dedup"
+git push origin main
+
+# 라즈베리파이
+ssh home "cd ~/project/sdo_auto_trader_crypto && git pull && bash start.sh"
+```
+
+`start.sh`가 자체적으로 기존 PID 종료 후 재시작하는 구조라 한 줄로 끝났다.
+
+## 결과 검증
+
+재시작 직후 로그를 봤다.
+
+```
+2026-04-26 00:00:18 | INFO | 봇 시작 완료
+2026-04-26 00:00:19 | INFO | User Data Stream WS 활성화
+2026-04-26 00:00:19 | INFO | Market Data WS 활성화 — Mark Price 1초 실시간 SL/TP 체크
+2026-04-26 00:00:19 | INFO | BTCUSDT 결합 전략 점수: -1.50 (BUY임계=2.5, SELL임계=-2.5)
+2026-04-26 00:00:19 | INFO | ETHUSDT L/S ratio 2.05 > 2.0 — 롱 과밀, 숏 스퀴즈 위험 → 진입 차단
+2026-04-26 00:00:19 | INFO | [대기중] 포지션 없음 ...
+```
+
+- 일일 손실 한도 WARNING이 사라졌다.
+- 결합 전략이 정상적으로 점수를 계산하고 있다.
+- 온체인 필터(L/S ratio)는 여전히 동작 중. ETH가 롱 과밀이라 진입 차단된 건 정상.
+
+매매 차단 해제됐고, 다음 자정(4-26 → 4-27)부터는 자동으로 `_daily_pnl=0`이 될 것이다.
+
+## 배운 점
+
+**누적 카운터에는 반드시 리셋 트리거를 명시한다.**
+`_daily_pnl`처럼 시간 윈도우(하루)를 가진 누적값은 그 윈도우가 끝났을 때 0으로 돌리는 코드가 같이 있어야 한다. 안 그러면 "버그 같지 않은 버그"가 된다 — 코드는 정상으로 보이는데 시간이 지나면서 동작이 망가진다.
+
+**비슷한 책임을 가진 클래스 사이의 비대칭은 의심한다.**
+`risk_manager.py`에 `_reset_daily_pnl_if_needed()`가 있다는 건 이미 누군가(과거의 나) 이 문제를 인지했다는 뜻이다. 그럼 왜 `futures_trader.py`에는 없는가? — 두 파일이 평행하게 발전하다가 한쪽이 누락된 케이스. 다음에 비슷한 누적 변수를 만들 때는 `grep '\\bself\\._' | grep -i 'daily\\|hour\\|minute'` 같은 식으로 시간 기반 변수를 일괄 점검하는 게 좋겠다.
+
+**"왜 매매를 안 하지?"가 가장 좋은 디버깅 트리거다.**
+오늘은 매매를 한 기억이 없는데 일일 손실이 -21이라는 모순이 출발점이었다. 만약 -21이 그럴듯해 보였다면 그냥 넘어갔을 거다. 봇 상태에 대한 직관(예상)을 가지고 있어야 비정상을 알아챌 수 있다.
+
+**실거래 봇은 SSH 한 줄 디버깅 워크플로우가 곧 운영 능력이다.**
+패치 → push → ssh pull → start.sh, 이 사이클이 5분 안에 끝나야 손실 누적 시간을 줄일 수 있다. GitHub Actions 자동 배포까지 붙이면 더 줄어들 것이다.
+
+## 남은 숙제
+
+- 거래소 잔고 기준 실제 손익과 봇이 기록한 `_daily_pnl`의 일치 여부 정기 점검 로직(예: 아침마다 reconciliation)
+- `_daily_pnl`을 DB에 영속화해서 봇 재시작 시 복원 (현재는 재시작하면 무조건 0으로 시작 — 일일 한도 회피 위험 있음)
+- `risk_manager.py`의 `RiskManager`와 `futures_trader.py`의 자체 PnL 추적을 하나로 통합
+
+뱅크롤이 작은 페이퍼 트레이딩이었기 때문에 -21 USDT는 학습비로 정리됐다. 다행이다.

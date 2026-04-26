@@ -106,73 +106,39 @@ export default function Home({ posts }) {
   return (
     <>
       <div className="space-y-10 pt-8">
-        <section className="ambient-panel overflow-hidden rounded-2xl px-6 py-8 md:px-8 md:py-10">
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,1.5fr)_minmax(240px,0.7fr)]">
-            <div>
-              <p
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                className="text-[11px] tracking-[0.1em] text-stone-500 uppercase dark:text-stone-400"
-              >
-                DONGOK SEO · BLOG
-              </p>
-              {/* Design Handoff — Hero headline with serif emphasis on 日本語 */}
-              <h1
-                style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
-                className="mt-3 text-[28px] leading-[1.2] text-stone-900 sm:text-4xl md:text-[42px] dark:text-stone-100"
-              >
-                Quant · Dev ·{' '}
-                <em className="text-accent dark:text-accent" style={{ fontStyle: 'italic' }}>
-                  日本語
-                </em>
-              </h1>
-              <p className="mt-5 max-w-[520px] text-[15.5px] leading-[1.8] text-stone-600 dark:text-stone-400">
-                3년차 개발자 서동옥 블로그입니다.
-              </p>
-              <HeroLanguageSwitch />
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Link
-                  href="/blog"
-                  className="border-primary-700 bg-primary-700 hover:bg-primary-800 rounded-full border px-5 py-2.5 text-sm tracking-[0.16em] text-white uppercase transition"
-                >
-                  {copy.blogCta}
-                </Link>
-                <Link
-                  href="/projects"
-                  className="hover:border-primary-500 hover:text-primary-700 rounded-full border border-stone-800/15 bg-white/70 px-5 py-2.5 text-sm tracking-[0.16em] text-stone-700 uppercase transition dark:border-stone-100/10 dark:bg-stone-900/40 dark:text-stone-100"
-                >
-                  {copy.projectCta}
-                </Link>
-              </div>
-            </div>
-            <div className="grid gap-4 self-end">
-              <div className="ambient-surface rounded-xl p-5">
-                <p className="text-xs tracking-[0.26em] text-stone-500 uppercase dark:text-stone-400">
-                  {copy.snapshot}
-                </p>
-                <dl className="mt-4 grid grid-cols-2 gap-4">
-                  <div>
-                    <dt className="text-xs text-stone-500 dark:text-stone-400">{copy.posts}</dt>
-                    <dd className="mt-1 text-3xl font-semibold text-stone-900 dark:text-stone-100">
-                      {posts.length}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-stone-500 dark:text-stone-400">{copy.tags}</dt>
-                    <dd className="mt-1 text-3xl font-semibold text-stone-900 dark:text-stone-100">
-                      {tagCount}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-              <div className="ambient-surface rounded-xl p-5">
-                <p className="text-xs tracking-[0.26em] text-stone-500 uppercase dark:text-stone-400">
-                  {copy.notes}
-                </p>
-                <p className="mt-3 text-[15.5px] leading-[1.8] text-stone-600 dark:text-stone-400">
-                  {copy.notesDescription}
-                </p>
-              </div>
-            </div>
+        <section className="ambient-panel overflow-hidden rounded-2xl px-6 py-10 md:px-10 md:py-14">
+          <p
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            className="text-[11px] tracking-[0.1em] text-stone-500 uppercase dark:text-stone-400"
+          >
+            DONGOK SEO · BLOG
+          </p>
+          <h1
+            style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
+            className="mt-4 text-[32px] leading-[1.15] text-stone-900 sm:text-[42px] md:text-[56px] dark:text-stone-100"
+          >
+            3년차 개발자 서동옥의 블로그
+          </h1>
+          <p
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            className="mt-5 text-[11px] tracking-[0.24em] text-stone-500 uppercase dark:text-stone-400"
+          >
+            Quant · Dev · 日本語
+          </p>
+          <HeroLanguageSwitch />
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href="/blog"
+              className="border-primary-700 bg-primary-700 hover:bg-primary-800 rounded-full border px-5 py-2.5 text-sm tracking-[0.16em] text-white uppercase transition"
+            >
+              {copy.blogCta}
+            </Link>
+            <Link
+              href="/projects"
+              className="hover:border-primary-500 hover:text-primary-700 rounded-full border border-stone-800/15 bg-white/70 px-5 py-2.5 text-sm tracking-[0.16em] text-stone-700 uppercase transition dark:border-stone-100/10 dark:bg-stone-900/40 dark:text-stone-100"
+            >
+              {copy.projectCta}
+            </Link>
           </div>
         </section>
 

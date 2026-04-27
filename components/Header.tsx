@@ -5,6 +5,7 @@ import MobileNav from './MobileNav'
 import ThemeSwitch from './ThemeSwitch'
 import SearchButton from './SearchButton'
 import LanguageSwitch from './LanguageSwitch'
+import BtcChip from './BtcChip'
 
 const Header = () => {
   let headerClass =
@@ -46,6 +47,7 @@ const Header = () => {
               </Link>
             ))}
         </div>
+        <BtcChip />
         <SearchButton />
         <LanguageSwitch />
         <ThemeSwitch />

@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import Link from '@/components/Link'
 import siteMetadata from '@/data/siteMetadata'
 import { formatDate } from 'pliny/utils/formatDate'
+import { useLanguage, type Language } from '@/components/LanguageContext'
 
 const CAT_COLOR: Record<string, string> = {
   quant: '#c8a06a',
@@ -11,19 +12,85 @@ const CAT_COLOR: Record<string, string> = {
   japan: '#cc7a9a',
   misc: '#888',
 }
-const CAT_LABEL: Record<string, string> = {
-  quant: '퀀트',
-  infra: '인프라',
-  japan: '일본어',
-  misc: '기타',
+
+const CAT_LABEL: Record<Language, Record<string, string>> = {
+  ko: { quant: '퀀트', infra: '인프라', japan: '일본어', misc: '기타' },
+  ja: { quant: 'クオンツ', infra: 'インフラ', japan: '日本語', misc: 'その他' },
+  en: { quant: 'Quant', infra: 'Infra', japan: 'Japanese', misc: 'Misc' },
 }
 
-const CATS = [
-  { id: 'all', label: '전체' },
-  { id: 'quant', label: '퀀트' },
-  { id: 'infra', label: '인프라' },
-  { id: 'japan', label: '일본어' },
-]
+const CATS_LABEL: Record<Language, { id: string; label: string }[]> = {
+  ko: [
+    { id: 'all', label: '전체' },
+    { id: 'quant', label: '퀀트' },
+    { id: 'infra', label: '인프라' },
+    { id: 'japan', label: '일본어' },
+  ],
+  ja: [
+    { id: 'all', label: 'すべて' },
+    { id: 'quant', label: 'クオンツ' },
+    { id: 'infra', label: 'インフラ' },
+    { id: 'japan', label: '日本語' },
+  ],
+  en: [
+    { id: 'all', label: 'All' },
+    { id: 'quant', label: 'Quant' },
+    { id: 'infra', label: 'Infra' },
+    { id: 'japan', label: 'Japanese' },
+  ],
+}
+
+const homeCopy: Record<
+  Language,
+  {
+    heroDesc: string
+    postsCta: string
+    recentLabel: string
+    searchPlaceholder: string
+    emptyMessage: string
+    allPosts: string
+    readAll: string
+    stratBacktest: string
+    japanese: string
+  }
+> = {
+  ko: {
+    heroDesc:
+      '퀀트 자동매매 봇을 만들고, 서버를 고치고, 일본어 단어를 외웁니다.\n그 과정에서 막히고 배운 것들을 여기에 씁니다.',
+    postsCta: '포스트 보기',
+    recentLabel: '최근 포스트',
+    searchPlaceholder: '검색...',
+    emptyMessage: '검색 결과가 없습니다.',
+    allPosts: '전체 글 보기 →',
+    readAll: '전체 글 읽기 →',
+    stratBacktest: '전략 백테스트',
+    japanese: '일본어',
+  },
+  ja: {
+    heroDesc:
+      'クオンツ自動売買ボットを作り、サーバーを直し、日本語の単語を覚えます。\nその過程で詰まったことや学んだことをここに書きます。',
+    postsCta: '記事を見る',
+    recentLabel: '最近の記事',
+    searchPlaceholder: '検索...',
+    emptyMessage: '検索結果がありません。',
+    allPosts: 'すべての記事を見る →',
+    readAll: '全文を読む →',
+    stratBacktest: '戦略バックテスト',
+    japanese: '日本語',
+  },
+  en: {
+    heroDesc:
+      'Building quant trading bots, fixing servers, and memorizing Japanese words.\nWriting down what I learn and where I get stuck.',
+    postsCta: 'View Posts',
+    recentLabel: 'Recent Posts',
+    searchPlaceholder: 'Search...',
+    emptyMessage: 'No results found.',
+    allPosts: 'View all posts →',
+    readAll: 'Read full post →',
+    stratBacktest: 'Backtests',
+    japanese: 'Japanese',
+  },
+}
 
 type Post = {
   slug: string
@@ -35,9 +102,17 @@ type Post = {
   readingTime?: { text: string; minutes: number }
 }
 
-function PostCard({ post, onClick }: { post: Post; onClick: (p: Post) => void }) {
+function PostCard({
+  post,
+  onClick,
+  lang,
+}: {
+  post: Post
+  onClick: (p: Post) => void
+  lang: Language
+}) {
   const cc = CAT_COLOR[post.category ?? 'misc'] ?? CAT_COLOR.misc
-  const catLabel = CAT_LABEL[post.category ?? 'misc'] ?? CAT_LABEL.misc
+  const catLabel = CAT_LABEL[lang][post.category ?? 'misc'] ?? CAT_LABEL[lang].misc
   const mins = Math.ceil(post.readingTime?.minutes ?? 5)
 
   return (
@@ -105,9 +180,17 @@ function PostCard({ post, onClick }: { post: Post; onClick: (p: Post) => void })
   )
 }
 
-function PostListItem({ post, onClick }: { post: Post; onClick: (p: Post) => void }) {
+function PostListItem({
+  post,
+  onClick,
+  lang,
+}: {
+  post: Post
+  onClick: (p: Post) => void
+  lang: Language
+}) {
   const cc = CAT_COLOR[post.category ?? 'misc'] ?? CAT_COLOR.misc
-  const catLabel = CAT_LABEL[post.category ?? 'misc'] ?? CAT_LABEL.misc
+  const catLabel = CAT_LABEL[lang][post.category ?? 'misc'] ?? CAT_LABEL[lang].misc
   const mins = Math.ceil(post.readingTime?.minutes ?? 5)
 
   return (
@@ -152,10 +235,11 @@ function PostListItem({ post, onClick }: { post: Post; onClick: (p: Post) => voi
   )
 }
 
-function PostModal({ post, onClose }: { post: Post; onClose: () => void }) {
+function PostModal({ post, onClose, lang }: { post: Post; onClose: () => void; lang: Language }) {
   const cc = CAT_COLOR[post.category ?? 'misc'] ?? CAT_COLOR.misc
-  const catLabel = CAT_LABEL[post.category ?? 'misc'] ?? CAT_LABEL.misc
+  const catLabel = CAT_LABEL[lang][post.category ?? 'misc'] ?? CAT_LABEL[lang].misc
   const mins = Math.ceil(post.readingTime?.minutes ?? 5)
+  const copy = homeCopy[lang]
 
   return (
     <div
@@ -239,7 +323,7 @@ function PostModal({ post, onClose }: { post: Post; onClose: () => void }) {
           }}
           className="mt-5 inline-flex items-center gap-2 rounded-[9px] px-5 py-2.5 text-[13px] font-semibold no-underline transition-opacity hover:opacity-80"
         >
-          전체 글 읽기 →
+          {copy.readAll}
         </Link>
       </div>
     </div>
@@ -247,6 +331,10 @@ function PostModal({ post, onClose }: { post: Post; onClose: () => void }) {
 }
 
 export default function Home({ posts }: { posts: Post[] }) {
+  const { language } = useLanguage()
+  const copy = homeCopy[language]
+  const CATS = CATS_LABEL[language]
+
   const [cat, setCat] = useState('all')
   const [search, setSearch] = useState('')
   const [listStyle, setListStyle] = useState<'card' | 'list'>('card')
@@ -298,8 +386,12 @@ export default function Home({ posts }: { posts: Post[] }) {
             <span style={{ color: 'var(--color-accent)', fontStyle: 'italic' }}>日本語</span>
           </h1>
           <p className="mb-7 max-w-[480px] text-[15.5px] leading-[1.8] text-stone-600 dark:text-stone-400">
-            퀀트 자동매매 봇을 만들고, 서버를 고치고, 일본어 단어를 외웁니다.
-            <br />그 과정에서 막히고 배운 것들을 여기에 씁니다.
+            {copy.heroDesc.split('\n').map((line, i) => (
+              <span key={i}>
+                {i > 0 && <br />}
+                {line}
+              </span>
+            ))}
           </p>
           <div className="flex flex-wrap gap-2.5">
             <a
@@ -307,7 +399,7 @@ export default function Home({ posts }: { posts: Post[] }) {
               style={{ background: 'var(--color-accent)' }}
               className="rounded-[9px] px-6 py-2.5 text-[14px] font-semibold whitespace-nowrap text-white no-underline transition-opacity hover:opacity-90"
             >
-              포스트 보기
+              {copy.postsCta}
             </a>
             <a
               href="https://github.com/SeoDongOk"
@@ -326,8 +418,8 @@ export default function Home({ posts }: { posts: Post[] }) {
         {[
           { k: 'Posts', v: String(posts.length) },
           { k: 'Tags', v: String(tagCount) },
-          { k: '전략 백테스트', v: '12개' },
-          { k: '일본어', v: 'JLPT N5' },
+          { k: copy.stratBacktest, v: '12개' },
+          { k: copy.japanese, v: 'JLPT N5' },
         ].map((s, i, a) => (
           <div
             key={s.k}
@@ -376,7 +468,7 @@ export default function Home({ posts }: { posts: Post[] }) {
               ⌕
             </span>
             <input
-              placeholder="검색..."
+              placeholder={copy.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{ fontFamily: "'DM Sans', sans-serif" }}
@@ -411,7 +503,7 @@ export default function Home({ posts }: { posts: Post[] }) {
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
             className="text-[10px] tracking-[0.1em] text-stone-400 uppercase dark:text-stone-500"
           >
-            최근 포스트
+            {copy.recentLabel}
           </span>
           <div className="h-px flex-1 bg-stone-900/8 dark:bg-stone-100/8" />
           <span
@@ -428,13 +520,13 @@ export default function Home({ posts }: { posts: Post[] }) {
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
             className="py-16 text-center text-[13px] text-stone-400 dark:text-stone-600"
           >
-            검색 결과가 없습니다.
+            {copy.emptyMessage}
           </div>
         ) : listStyle === 'list' ? (
           <div>
             {filtered.map((post, i) => (
               <div key={post.slug} style={{ animation: `fadeUp 0.35s ease ${i * 0.03}s both` }}>
-                <PostListItem post={post} onClick={setSelected} />
+                <PostListItem post={post} onClick={setSelected} lang={language} />
               </div>
             ))}
           </div>
@@ -442,7 +534,7 @@ export default function Home({ posts }: { posts: Post[] }) {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((post, i) => (
               <div key={post.slug} style={{ animation: `fadeUp 0.35s ease ${i * 0.04}s both` }}>
-                <PostCard post={post} onClick={setSelected} />
+                <PostCard post={post} onClick={setSelected} lang={language} />
               </div>
             ))}
           </div>
@@ -453,12 +545,12 @@ export default function Home({ posts }: { posts: Post[] }) {
             href="/blog"
             className="inline-block rounded-[9px] border border-stone-900/10 px-7 py-2.5 text-[14px] font-medium text-stone-500 no-underline transition-all hover:border-stone-900/20 hover:text-stone-700 dark:border-stone-100/8 dark:text-stone-500 dark:hover:border-stone-100/15 dark:hover:text-stone-300"
           >
-            전체 글 보기 →
+            {copy.allPosts}
           </Link>
         </div>
       </section>
 
-      {selected && <PostModal post={selected} onClose={() => setSelected(null)} />}
+      {selected && <PostModal post={selected} onClose={() => setSelected(null)} lang={language} />}
     </>
   )
 }

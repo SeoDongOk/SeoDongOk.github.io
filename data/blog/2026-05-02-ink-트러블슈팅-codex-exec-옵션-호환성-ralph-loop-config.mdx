@@ -1,0 +1,84 @@
+---
+title: 'Codex exec 옵션 호환성 문제로 Ralph Loop가 시작되지 않던 이슈'
+date: 2026-05-02
+tags: [Codex, Ralph Loop, CLI, Automation, React Native]
+project: INK
+---
+
+## 문제 상황
+
+INK React Native 프로젝트에 `Ralph Loop` 자동 수정 루프를 붙이는 과정에서 `codex exec`를 서브프로세스로 실행했는데, 루프가 첫 iteration에서 바로 종료됐다.
+
+실행 커맨드는 대략 아래와 같았다.
+
+```bash
+node scripts/ralph-loop.mjs \
+  --agent codex \
+  --profile ink-rn \
+  --task "Add Sign in with Apple..."
+```
+
+로그에는 다음 에러가 남았다.
+
+```text
+error: unexpected argument '--ask-for-approval' found
+```
+
+## 원인 분석
+
+`codex` 최상위 CLI에서는 보이던 옵션을 그대로 `codex exec` 서브커맨드에도 넣을 수 있다고 가정한 게 문제였다.
+
+초기 설정은 아래처럼 되어 있었다.
+
+```json
+{
+  "agents": {
+    "codex": {
+      "command": "codex",
+      "args": [
+        "exec",
+        "--skip-git-repo-check",
+        "--ask-for-approval",
+        "never",
+        "--sandbox",
+        "workspace-write"
+      ]
+    }
+  }
+}
+```
+
+하지만 실제로는 `codex exec --help` 기준으로 `--ask-for-approval`는 지원되지 않았다. 즉, 루프 스크립트 문제라기보다 `codex exec` 서브커맨드 옵션 호환성 오해였다.
+
+## 해결 방법
+
+`ralph-loop.config.json`에서 `codex` 프로필의 불필요한 옵션을 제거했다.
+
+수정 후 설정:
+
+```json
+{
+  "agents": {
+    "codex": {
+      "command": "codex",
+      "args": ["exec", "--skip-git-repo-check", "--ephemeral", "--sandbox", "workspace-write"]
+    }
+  }
+}
+```
+
+핵심은 두 가지였다.
+
+```bash
+codex exec --help
+node scripts/ralph-loop.mjs --agent codex --profile ink-rn --dry-run
+```
+
+- `codex exec --help`로 실제 지원 옵션을 다시 확인했다.
+- 공통 래퍼를 만들 때는 최상위 CLI 옵션과 서브커맨드 옵션을 분리해서 관리해야 한다.
+
+## 배운 점
+
+- CLI 자동화는 “대충 될 것 같은 옵션”을 넣는 순간 바로 깨진다. 반드시 **실행 대상 서브커맨드 기준 도움말**을 봐야 한다.
+- 에이전트 래퍼를 만들 때는 `codex`, `claude`처럼 도구별로 공통 인터페이스만 맞추고, 실제 인자 세트는 따로 관리하는 게 안전하다.
+- `--dry-run` 출력은 자동화 스크립트에서 생각보다 중요하다. 실제 실행 전에 최종 커맨드 구성을 검증할 수 있다.

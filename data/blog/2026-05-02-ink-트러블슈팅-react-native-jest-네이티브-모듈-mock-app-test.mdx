@@ -1,0 +1,87 @@
+---
+title: 'React Native Jest에서 네이티브 모듈 때문에 App.test가 깨질 때 mock으로 복구한 방법'
+date: 2026-05-02
+tags: [React Native, Jest, Mock, Native Module, Testing]
+project: INK
+---
+
+## 문제 상황
+
+INK React Native 앱에서 `npm test -- --watch=false`를 돌릴 때 `App.test.tsx`가 계속 실패했다.
+
+대표 에러는 아래 두 종류였다.
+
+```text
+Cannot find module '@react-native-seoul/kakao-login'
+```
+
+```text
+Cannot find module 'react-native-iap'
+```
+
+채팅 이미지 전송을 붙인 뒤에는 `react-native-image-picker`도 같은 성격의 문제를 만들 수 있는 상태였다.
+
+## 원인 분석
+
+`App.tsx`가 루트 네비게이션과 화면들을 한 번에 로드하면서, 테스트가 실제 네이티브 브리지 의존 패키지까지 따라 들어갔다.
+
+문제는 이 패키지들이 Jest 환경에서는 다음 이유로 바로 깨진다는 점이다.
+
+- 네이티브 런타임이 없음
+- 일부 모듈은 설치/링킹되지 않았거나 테스트 해석 대상이 아님
+- RN 앱 전체 렌더 테스트는 의도와 무관한 외부 의존성을 너무 많이 끌어옴
+
+즉, 화면 로직이 잘못된 게 아니라 **테스트 부트 환경이 네이티브 모듈을 감당하지 못한 것**이었다.
+
+## 해결 방법
+
+`__tests__/App.test.tsx`에서 문제 모듈을 선제 mock 처리했다.
+
+```tsx
+jest.mock(
+  '@react-native-seoul/kakao-login',
+  () => ({
+    getProfile: jest.fn(),
+    login: jest.fn(),
+  }),
+  { virtual: true }
+)
+
+jest.mock('react-native-image-picker', () => ({
+  launchImageLibrary: jest.fn(),
+}))
+
+jest.mock(
+  'react-native-iap',
+  () => ({
+    endConnection: jest.fn(),
+    finishTransaction: jest.fn(),
+    getAvailablePurchases: jest.fn(),
+    getProducts: jest.fn(),
+    initConnection: jest.fn(),
+    purchaseErrorListener: jest.fn(() => ({ remove: jest.fn() })),
+    purchaseUpdatedListener: jest.fn(() => ({ remove: jest.fn() })),
+    requestPurchase: jest.fn(),
+  }),
+  { virtual: true }
+)
+```
+
+그 뒤 다시 테스트를 실행했다.
+
+```bash
+cd /Users/seodong-og/project_vs/plan/vietnam-in-korea-superapp-rn
+npm test -- --watch=false
+```
+
+결과:
+
+```text
+PASS __tests__/App.test.tsx
+```
+
+## 배운 점
+
+- RN 루트 렌더 테스트는 화면보다 **네이티브 의존성** 때문에 먼저 깨질 수 있다.
+- `virtual: true`는 실제 패키지가 Jest 해석 경로에서 문제를 일으킬 때 특히 유용하다.
+- 새 기능을 붙일 때 `react-native-image-picker`, `react-native-iap`, 소셜 로그인 SDK처럼 **네이티브 모듈은 테스트 mock도 같이 추가**하는 습관이 필요하다.

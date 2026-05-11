@@ -1,0 +1,89 @@
+---
+title: 'verify-purchase가 실제 스키마와 어긋나서 구독/충전 로직이 깨질 수 있던 문제'
+date: 2026-05-02
+tags: [Supabase, IAP, Subscription, Sen, Edge Function]
+project: INK
+---
+
+## 문제 상황
+
+INK 앱의 구독/충전 흐름은 겉으로는 연결돼 있었지만, 실제 `verify-purchase` Edge Function을 확인해보니 DB 스키마와 맞지 않는 부분이 여러 군데 있었다.
+
+대표적으로 이런 문제가 있었다.
+
+- `user_subscriptions` 테이블을 쓰는데 실제 마이그레이션에는 테이블이 없음
+- `user_profiles.subscription_expires_at`를 읽는데 컬럼이 없음
+- `sen_transactions`에는 `tx_type`, `description`, `balance_after`가 필요한데 함수는 `type`, `sku`, `transaction_id` 같은 다른 컬럼으로 insert
+- 클라이언트 `SenTopUpScreen`은 서버 검증 성공 뒤에도 다시 `charge()`를 호출해서 이중 충전 위험이 있었음
+
+즉, UI와 훅은 있어도 **서버 검증 결과가 실제 DB 모델로 닫히지 않는 상태**였다.
+
+## 원인 분석
+
+원인은 구독/IAP 기능이 여러 단계로 나뉘어 자라면서, 각 단계의 계약이 서로 어긋난 것이었다.
+
+1. `subscriptionSync`는 `subscription_expires_at`을 기대함
+2. `verify-purchase`는 `user_subscriptions`와 결제 추적 필드를 기대함
+3. 실제 DB 마이그레이션은 그 중 일부만 반영돼 있었음
+4. 클라이언트 충전 성공 콜백은 예전 로컬 충전 로직을 그대로 유지하고 있었음
+
+이런 상태에서는 실제 결제가 들어오면
+
+- 구독 상태 저장 실패
+- Sen 트랜잭션 기록 실패
+- 운 나쁘면 이중 충전
+
+같은 문제가 발생할 수 있었다.
+
+## 해결 방법
+
+### 1. 구독 런타임 스키마 추가
+
+새 마이그레이션으로 아래를 추가했다.
+
+- `user_profiles.subscription_expires_at`
+- `user_subscriptions`
+- `sen_transactions.external_transaction_id`
+- `sen_transactions.external_product_id`
+- `sen_transactions.external_platform`
+
+핵심은 `verify-purchase`가 기대하는 영수증/구독 상태를 저장할 실제 구조를 먼저 만드는 것이었다.
+
+### 2. verify-purchase를 실제 스키마에 맞게 수정
+
+구독 처리에서는:
+
+- `user_subscriptions` upsert
+- SKU 기준 tier 계산
+- `user_profiles.subscription_tier`, `subscription_expires_at` 갱신
+
+충전 처리에서는:
+
+- 현재 `sen_balance` 조회
+- `tx_type: 'charge'`로 `sen_transactions` insert
+- 새 잔액 계산 후 `user_profiles.sen_balance` update
+
+즉, 더 이상 존재하지 않는 RPC나 잘못된 컬럼명에 기대지 않도록 바꿨다.
+
+### 3. 클라이언트 이중 충전 제거
+
+`SenTopUpScreen`에서는 결제 성공 콜백에서 더 이상 `charge()`를 호출하지 않고 `refresh()`만 호출하도록 바꿨다.
+
+```tsx
+const handleSenPurchased = useCallback(
+  (amount: number) => {
+    refresh().catch(() => {})
+    setPurchaseStatus('success')
+  },
+  [refresh]
+)
+```
+
+서버가 이미 잔액을 올렸다면, 클라이언트는 새 상태만 다시 읽어오면 된다.
+
+## 배운 점
+
+- 결제 기능은 UI가 떠 있는 것과 실제로 작동하는 것이 완전히 다른 문제다.
+- `Edge Function -> DB schema -> client state refresh` 계약이 한 군데라도 어긋나면, 결제 로직은 바로 위험해진다.
+- 서버에서 상태를 확정했다면 클라이언트는 로컬로 다시 적립하지 말고 **재조회만 해야 한다**.
+- 구독/충전처럼 돈이 걸린 기능은 “필드명 하나”가 틀려도 바로 장애가 된다. 스키마와 함수 코드는 반드시 같이 점검해야 한다.

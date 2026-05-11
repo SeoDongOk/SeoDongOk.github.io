@@ -1,0 +1,109 @@
+---
+title: 'INK 채팅 실검증에서 막힌 RLS, 레거시 트리거, 읽음 처리 정리'
+date: 2026-05-02
+tags: [supabase, chat, rls, trigger, realtime, react-native]
+project: INK
+---
+
+## 문제 상황
+
+INK RN 채팅 기능을 원격 Supabase에서 2계정으로 실검증하면서 세 가지 문제가 연속으로 드러났다.
+
+1. `mutual like` 직후 direct chat room 생성이 `chat_rooms` RLS에 막혔다.
+2. `send_chat_message` 호출 시 원격 DB의 레거시 트리거가 `message_type` 컬럼을 참조해 400 에러가 났다.
+3. 메시지는 정상 송수신되는데 `last_read_at`이 갱신되지 않아 unread가 줄지 않았다.
+
+## 원인 분석
+
+첫 번째 문제는 매치 생성 트리거에서 채팅방 생성까지 한 번에 처리하려던 설계가 RLS와 충돌한 것이었다.
+
+두 번째 문제는 현재 마이그레이션 기준 `chat_messages`에 `message_type` 컬럼이 없는데, 예전 수동 스키마에서 남은 트리거 함수가 원격 DB에 남아 있었기 때문이다.
+
+세 번째 문제는 `chat_room_members`에 `update` 정책이 없는데 앱 코드가 직접 테이블 업데이트를 시도하고 있었기 때문이다. 에러를 명시적으로 처리하지 않아 실검증 전까지는 조용히 실패했다.
+
+## 해결 방법
+
+### 1. 매치 생성과 채팅방 생성을 분리
+
+`match_pairs`만 먼저 만들고, 실제 room 생성은 별도 RPC에서 보장하도록 바꿨다.
+
+```sql
+create or replace function public.ensure_direct_match_room(p_other_user_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+```
+
+관련 파일:
+
+- `supabase/migrations/20260502000008_ink_chat_match_room_decouple.sql`
+- `src/services/supabase/matchingService.ts`
+
+### 2. 레거시 chat_messages 트리거 정리
+
+원격 DB에 남아 있던 `chat_messages` 트리거들을 모두 정리하고, 현재 스키마 기준의 `update_room_last_message()`만 다시 등록했다.
+
+```sql
+do $$
+declare
+  trigger_row record;
+begin
+  for trigger_row in
+    select tg.tgname
+    from pg_trigger tg
+    join pg_class tbl on tbl.oid = tg.tgrelid
+    join pg_namespace ns on ns.oid = tbl.relnamespace
+    where ns.nspname = 'public'
+      and tbl.relname = 'chat_messages'
+      and not tg.tgisinternal
+  loop
+    execute format(
+      'drop trigger if exists %I on public.chat_messages',
+      trigger_row.tgname
+    );
+  end loop;
+end $$;
+```
+
+관련 파일:
+
+- `supabase/migrations/20260502000009_ink_chat_message_trigger_cleanup.sql`
+
+### 3. 읽음 처리를 RPC로 고정
+
+앱이 `chat_room_members`를 직접 업데이트하지 않고, 본인 멤버십만 안전하게 갱신하는 `security definer` RPC를 사용하도록 변경했다.
+
+```sql
+create or replace function public.mark_chat_room_as_read(p_room_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+```
+
+앱 쪽도 `.from('chat_room_members').update(...)` 대신 RPC를 호출하도록 바꿨다.
+
+관련 파일:
+
+- `supabase/migrations/20260502000010_ink_chat_mark_read_rpc.sql`
+- `src/services/supabase/chatService.ts`
+
+## 배운 점
+
+실시간 채팅처럼 경로가 긴 기능은 “구현 완료”보다 “원격 2계정 실검증 통과”가 더 중요하다.
+
+특히 Supabase에서는 아래를 초기에 분리해서 설계하는 편이 안전하다.
+
+- 사용자 액션 트리거와 부수 리소스 생성
+- 직접 테이블 업데이트와 `security definer` RPC
+- 현재 스키마와 충돌할 수 있는 레거시 트리거 정리
+
+이번 수정 뒤 원격 2계정 검증에서 다음 항목이 모두 통과했다.
+
+- mutual like 후 room 보장
+- 첫 메시지 전송 시 3 Sen 차감
+- 두 번째 메시지 추가 차감 없음
+- unread 2 -> 0 감소
+- 이미지 메시지 전송
+- soft delete 후 `is_deleted = true`, `body/image_url = null`

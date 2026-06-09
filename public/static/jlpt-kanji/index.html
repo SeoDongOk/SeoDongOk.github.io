@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>JLPT N5·N4 한자 인터랙티브 학습</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#181b22; --panel2:#1f232c; --line:#2a2f3a;
+    --txt:#e7ebf2; --sub:#9aa3b2; --accent:#6ea8fe; --accent2:#22c55e;
+    --n5:#6ea8fe; --n4:#f0883e; --warn:#fbbf24; --bad:#ef4444;
+    --shadow:0 6px 24px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR","Hiragino Sans",sans-serif;
+    line-height:1.5; padding:16px; max-width:1100px; margin:0 auto;
+  }
+  h1{font-size:1.35rem; margin:.2rem 0 .1rem}
+  .sub{color:var(--sub); font-size:.82rem; margin-bottom:14px}
+  .sub b{color:var(--warn)}
+
+  .bar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px}
+  .seg{display:inline-flex; background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden}
+  .seg button{
+    background:transparent; color:var(--sub); border:0; padding:8px 16px;
+    font-size:.9rem; font-weight:600; cursor:pointer; transition:.15s;
+  }
+  .seg button.on{color:#fff}
+  .seg.level button.on[data-level="N5"]{background:var(--n5)}
+  .seg.level button.on[data-level="N4"]{background:var(--n4)}
+  .seg.mode button.on{background:var(--panel2); color:#fff}
+
+  .spacer{flex:1}
+  .search{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:8px 12px; color:var(--txt); font-size:.88rem; min-width:160px;
+  }
+  .search::placeholder{color:var(--sub)}
+
+  .stat{font-size:.8rem; color:var(--sub); display:flex; gap:14px; align-items:center; margin-bottom:12px; flex-wrap:wrap}
+  .stat b{color:var(--accent2)}
+  .progwrap{flex:1; min-width:140px; height:8px; background:var(--panel2); border-radius:99px; overflow:hidden}
+  .progbar{height:100%; width:0; background:linear-gradient(90deg,var(--accent2),#86efac); transition:width .3s}
+  .reset{background:none;border:1px solid var(--line);color:var(--sub);border-radius:8px;padding:4px 10px;font-size:.75rem;cursor:pointer}
+
+  /* ===== 그리드 학습 ===== */
+  #grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px}
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:12px; cursor:pointer; position:relative; transition:.15s; overflow:hidden;
+  }
+  .card:hover{border-color:var(--accent); transform:translateY(-2px)}
+  .card.known{border-color:var(--accent2); background:linear-gradient(180deg,rgba(34,197,94,.08),var(--panel))}
+  .card .kanji{font-size:2.4rem; font-weight:700; line-height:1.1; font-family:"Hiragino Mincho ProN","Yu Mincho",serif}
+  .card .read{font-size:.78rem; color:var(--sub); margin-top:6px}
+  .card .read .on{color:var(--accent)}
+  .card .read .kun{color:#f9a8d4}
+  .card .mean{font-size:.92rem; font-weight:600; margin-top:4px}
+  .card .ex{font-size:.74rem; color:var(--sub); margin-top:6px; border-top:1px dashed var(--line); padding-top:5px}
+  .card .chk{position:absolute; top:8px; right:10px; font-size:.9rem; opacity:.25}
+  .card.known .chk{opacity:1; color:var(--accent2)}
+  .badge{position:absolute; top:8px; left:10px; font-size:.6rem; font-weight:700; padding:1px 6px; border-radius:99px; color:#fff}
+  .badge.N5{background:var(--n5)} .badge.N4{background:var(--n4)}
+
+  /* ===== 플래시카드 ===== */
+  #flash{display:none; flex-direction:column; align-items:center; gap:16px; padding:10px}
+  .fc{
+    width:min(420px,92vw); height:300px; perspective:1200px; cursor:pointer;
+  }
+  .fc-inner{position:relative; width:100%; height:100%; transition:transform .5s; transform-style:preserve-3d}
+  .fc.flip .fc-inner{transform:rotateY(180deg)}
+  .fc-face{
+    position:absolute; inset:0; backface-visibility:hidden; border-radius:18px;
+    background:var(--panel); border:1px solid var(--line); box-shadow:var(--shadow);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:20px; text-align:center;
+  }
+  .fc-front .bk{font-size:6rem; font-weight:700; font-family:"Hiragino Mincho ProN","Yu Mincho",serif}
+  .fc-front .hint{color:var(--sub); font-size:.8rem}
+  .fc-back{transform:rotateY(180deg)}
+  .fc-back .mean{font-size:1.8rem; font-weight:700}
+  .fc-back .read{color:var(--sub); font-size:1rem}
+  .fc-back .read .on{color:var(--accent)} .fc-back .read .kun{color:#f9a8d4}
+  .fc-back .ex{color:var(--sub); font-size:.9rem; margin-top:6px}
+  .fc-ctrl{display:flex; gap:10px; align-items:center}
+  .fc-ctrl button{
+    background:var(--panel2); border:1px solid var(--line); color:var(--txt);
+    border-radius:10px; padding:10px 18px; font-size:.9rem; font-weight:600; cursor:pointer;
+  }
+  .fc-ctrl button.good{background:var(--accent2); border-color:var(--accent2); color:#062b13}
+  .fc-ctrl .count{color:var(--sub); font-size:.85rem; min-width:70px; text-align:center}
+
+  /* ===== 퀴즈 ===== */
+  #quiz{display:none; flex-direction:column; align-items:center; gap:16px; padding:10px}
+  .qz-q{font-size:5rem; font-weight:700; font-family:"Hiragino Mincho ProN","Yu Mincho",serif}
+  .qz-prompt{color:var(--sub); font-size:.85rem; margin-top:-8px}
+  .qz-opts{display:grid; grid-template-columns:1fr 1fr; gap:10px; width:min(460px,92vw)}
+  .qz-opts button{
+    background:var(--panel); border:1px solid var(--line); color:var(--txt);
+    border-radius:12px; padding:14px; font-size:1rem; font-weight:600; cursor:pointer; transition:.12s;
+  }
+  .qz-opts button:hover{border-color:var(--accent)}
+  .qz-opts button.correct{background:var(--accent2); border-color:var(--accent2); color:#062b13}
+  .qz-opts button.wrong{background:var(--bad); border-color:var(--bad); color:#fff}
+  .qz-score{color:var(--sub); font-size:.9rem}
+  .qz-score b{color:var(--accent2)}
+  .qz-next{background:var(--accent); border:0; color:#06214d; border-radius:10px; padding:10px 22px; font-weight:700; cursor:pointer; visibility:hidden}
+
+  .empty{color:var(--sub); text-align:center; padding:40px; grid-column:1/-1}
+  footer{margin-top:28px; color:var(--sub); font-size:.72rem; text-align:center; border-top:1px solid var(--line); padding-top:14px}
+  @media(max-width:520px){
+    .qz-q{font-size:4rem} .fc-front .bk{font-size:4.5rem}
+    .stat{font-size:.72rem}
+  }
+</style>
+</head>
+<body>
+  <h1>🗾 JLPT N5·N4 한자 인터랙티브 학습</h1>
+  <div class="sub">학습 → 플래시카드 → 퀴즈로 익히세요. 외운 한자는 ✅로 표시되고 자동 저장됩니다. <b>※ 통용 리스트 기준 (JLPT 공식 한자표는 비공개)</b></div>
+
+  <div class="bar">
+    <div class="seg level" id="levelSeg">
+      <button data-level="N5" class="on">N5</button>
+      <button data-level="N4">N4</button>
+    </div>
+    <div class="seg mode" id="modeSeg">
+      <button data-mode="grid" class="on">📖 학습</button>
+      <button data-mode="flash">🃏 플래시</button>
+      <button data-mode="quiz">❓ 퀴즈</button>
+    </div>
+    <div class="spacer"></div>
+    <input class="search" id="search" placeholder="🔍 한자·뜻·읽기 검색" />
+  </div>
+
+  <div class="stat">
+    <span>외운 한자 <b id="knownCount">0</b> / <span id="totalCount">0</span></span>
+    <div class="progwrap"><div class="progbar" id="progbar"></div></div>
+    <button class="reset" id="resetBtn">현재 레벨 진도 초기화</button>
+  </div>
+
+  <!-- 학습 그리드 -->
+  <div id="grid"></div>
+
+  <!-- 플래시카드 -->
+  <div id="flash">
+    <div class="fc" id="fcCard">
+      <div class="fc-inner">
+        <div class="fc-face fc-front">
+          <div class="bk" id="fcKanji">日</div>
+          <div class="hint">탭하면 뜻이 보여요</div>
+        </div>
+        <div class="fc-face fc-back">
+          <div class="mean" id="fcMean"></div>
+          <div class="read" id="fcRead"></div>
+          <div class="ex" id="fcEx"></div>
+        </div>
+      </div>
+    </div>
+    <div class="fc-ctrl">
+      <button id="fcShuffle">🔀 셔플</button>
+      <span class="count" id="fcCount">1 / 1</span>
+      <button class="good" id="fcKnown">✅ 외웠어요</button>
+      <button id="fcNext">다음 ▶</button>
+    </div>
+  </div>
+
+  <!-- 퀴즈 -->
+  <div id="quiz">
+    <div class="qz-q" id="qzKanji">?</div>
+    <div class="qz-prompt">이 한자의 뜻은?</div>
+    <div class="qz-opts" id="qzOpts"></div>
+    <div class="qz-score">점수 <b id="qzScore">0</b> / <span id="qzTotal">0</span></div>
+    <button class="qz-next" id="qzNext">다음 문제 ▶</button>
+  </div>
+
+  <footer>
+    데이터: JLPT N5·N4 통용 한자 리스트(공식 비공개) · 진도는 브라우저(localStorage)에 저장됩니다 · 한자는 단어 단위로 익히는 것을 추천합니다.
+  </footer>
+
+<script>
+/* ===================== 한자 데이터 ===================== */
+/* k:한자 on:음독 kun:훈독 m:뜻 ex:예시단어 exr:예시읽기/뜻 */
+const DATA = {
+N5: [
+ {k:"日",on:"ニチ・ジツ",kun:"ひ・か",m:"날·해",ex:"日曜日",exr:"にちようび / 일요일"},
+ {k:"月",on:"ゲツ・ガツ",kun:"つき",m:"달·월",ex:"月曜日",exr:"げつようび / 월요일"},
+ {k:"火",on:"カ",kun:"ひ",m:"불",ex:"火曜日",exr:"かようび / 화요일"},
+ {k:"水",on:"スイ",kun:"みず",m:"물",ex:"水曜日",exr:"すいようび / 수요일"},
+ {k:"木",on:"モク・ボク",kun:"き",m:"나무",ex:"木曜日",exr:"もくようび / 목요일"},
+ {k:"金",on:"キン・コン",kun:"かね",m:"금·돈",ex:"金曜日",exr:"きんようび / 금요일"},
+ {k:"土",on:"ド・ト",kun:"つち",m:"흙",ex:"土曜日",exr:"どようび / 토요일"},
+ {k:"一",on:"イチ",kun:"ひと(つ)",m:"하나",ex:"一つ",exr:"ひとつ / 한 개"},
+ {k:"二",on:"ニ",kun:"ふた(つ)",m:"둘",ex:"二つ",exr:"ふたつ / 두 개"},
+ {k:"三",on:"サン",kun:"みっ(つ)",m:"셋",ex:"三つ",exr:"みっつ / 세 개"},
+ {k:"四",on:"シ",kun:"よん・よっ(つ)",m:"넷",ex:"四つ",exr:"よっつ / 네 개"},
+ {k:"五",on:"ゴ",kun:"いつ(つ)",m:"다섯",ex:"五つ",exr:"いつつ / 다섯 개"},
+ {k:"六",on:"ロク",kun:"むっ(つ)",m:"여섯",ex:"六つ",exr:"むっつ / 여섯 개"},
+ {k:"七",on:"シチ",kun:"なな(つ)",m:"일곱",ex:"七つ",exr:"ななつ / 일곱 개"},
+ {k:"八",on:"ハチ",kun:"やっ(つ)",m:"여덟",ex:"八つ",exr:"やっつ / 여덟 개"},
+ {k:"九",on:"キュウ・ク",kun:"ここの(つ)",m:"아홉",ex:"九つ",exr:"ここのつ / 아홉 개"},
+ {k:"十",on:"ジュウ",kun:"とお",m:"열",ex:"十",exr:"じゅう / 10"},
+ {k:"百",on:"ヒャク",kun:"—",m:"백",ex:"三百",exr:"さんびゃく / 300"},
+ {k:"千",on:"セン",kun:"ち",m:"천",ex:"千円",exr:"せんえん / 1000엔"},
+ {k:"万",on:"マン・バン",kun:"—",m:"만",ex:"一万",exr:"いちまん / 10000"},
+ {k:"円",on:"エン",kun:"まる(い)",m:"엔·원",ex:"百円",exr:"ひゃくえん / 100엔"},
+ {k:"人",on:"ジン・ニン",kun:"ひと",m:"사람",ex:"日本人",exr:"にほんじん / 일본인"},
+ {k:"大",on:"ダイ・タイ",kun:"おお(きい)",m:"크다",ex:"大きい",exr:"おおきい / 크다"},
+ {k:"小",on:"ショウ",kun:"ちい(さい)",m:"작다",ex:"小さい",exr:"ちいさい / 작다"},
+ {k:"中",on:"チュウ",kun:"なか",m:"가운데·안",ex:"中学",exr:"ちゅうがく / 중학교"},
+ {k:"上",on:"ジョウ",kun:"うえ・あ(がる)",m:"위",ex:"上",exr:"うえ / 위"},
+ {k:"下",on:"カ・ゲ",kun:"した・さ(げる)",m:"아래",ex:"下",exr:"した / 아래"},
+ {k:"左",on:"サ",kun:"ひだり",m:"왼쪽",ex:"左",exr:"ひだり / 왼쪽"},
+ {k:"右",on:"ウ・ユウ",kun:"みぎ",m:"오른쪽",ex:"右",exr:"みぎ / 오른쪽"},
+ {k:"前",on:"ゼン",kun:"まえ",m:"앞",ex:"午前",exr:"ごぜん / 오전"},
+ {k:"後",on:"ゴ・コウ",kun:"うし(ろ)・あと",m:"뒤·후",ex:"午後",exr:"ごご / 오후"},
+ {k:"山",on:"サン",kun:"やま",m:"산",ex:"富士山",exr:"ふじさん / 후지산"},
+ {k:"川",on:"セン",kun:"かわ",m:"강",ex:"川",exr:"かわ / 강"},
+ {k:"田",on:"デン",kun:"た",m:"논",ex:"田んぼ",exr:"たんぼ / 논"},
+ {k:"天",on:"テン",kun:"あま",m:"하늘",ex:"天気",exr:"てんき / 날씨"},
+ {k:"気",on:"キ・ケ",kun:"—",m:"기운",ex:"元気",exr:"げんき / 건강함"},
+ {k:"雨",on:"ウ",kun:"あめ",m:"비",ex:"雨",exr:"あめ / 비"},
+ {k:"空",on:"クウ",kun:"そら・あ(く)",m:"하늘·비다",ex:"空",exr:"そら / 하늘"},
+ {k:"花",on:"カ",kun:"はな",m:"꽃",ex:"花",exr:"はな / 꽃"},
+ {k:"口",on:"コウ",kun:"くち",m:"입",ex:"入口",exr:"いりぐち / 입구"},
+ {k:"目",on:"モク",kun:"め",m:"눈",ex:"目",exr:"め / 눈"},
+ {k:"耳",on:"ジ",kun:"みみ",m:"귀",ex:"耳",exr:"みみ / 귀"},
+ {k:"手",on:"シュ",kun:"て",m:"손",ex:"手",exr:"て / 손"},
+ {k:"足",on:"ソク",kun:"あし・た(りる)",m:"발·충분",ex:"足",exr:"あし / 발"},
+ {k:"父",on:"フ",kun:"ちち・とう",m:"아버지",ex:"お父さん",exr:"おとうさん / 아버지"},
+ {k:"母",on:"ボ",kun:"はは・かあ",m:"어머니",ex:"お母さん",exr:"おかあさん / 어머니"},
+ {k:"兄",on:"キョウ",kun:"あに・にい",m:"형·오빠",ex:"お兄さん",exr:"おにいさん / 형·오빠"},
+ {k:"弟",on:"ダイ・テイ",kun:"おとうと",m:"남동생",ex:"弟",exr:"おとうと / 남동생"},
+ {k:"姉",on:"シ",kun:"あね・ねえ",m:"누나·언니",ex:"お姉さん",exr:"おねえさん / 누나·언니"},
+ {k:"妹",on:"マイ",kun:"いもうと",m:"여동생",ex:"妹",exr:"いもうと / 여동생"},
+ {k:"子",on:"シ",kun:"こ",m:"아이",ex:"子供",exr:"こども / 아이"},
+ {k:"男",on:"ダン・ナン",kun:"おとこ",m:"남자",ex:"男",exr:"おとこ / 남자"},
+ {k:"女",on:"ジョ・ニョ",kun:"おんな",m:"여자",ex:"女",exr:"おんな / 여자"},
+ {k:"東",on:"トウ",kun:"ひがし",m:"동쪽",ex:"東京",exr:"とうきょう / 도쿄"},
+ {k:"西",on:"セイ・サイ",kun:"にし",m:"서쪽",ex:"西",exr:"にし / 서쪽"},
+ {k:"南",on:"ナン",kun:"みなみ",m:"남쪽",ex:"南",exr:"みなみ / 남쪽"},
+ {k:"北",on:"ホク",kun:"きた",m:"북쪽",ex:"北",exr:"きた / 북쪽"},
+ {k:"車",on:"シャ",kun:"くるま",m:"차·수레",ex:"電車",exr:"でんしゃ / 전철"},
+ {k:"電",on:"デン",kun:"—",m:"전기",ex:"電話",exr:"でんわ / 전화"},
+ {k:"駅",on:"エキ",kun:"—",m:"역",ex:"駅",exr:"えき / 역"},
+ {k:"道",on:"ドウ",kun:"みち",m:"길",ex:"道",exr:"みち / 길"},
+ {k:"国",on:"コク",kun:"くに",m:"나라",ex:"国",exr:"くに / 나라"},
+ {k:"年",on:"ネン",kun:"とし",m:"해·년",ex:"今年",exr:"ことし / 올해"},
+ {k:"時",on:"ジ",kun:"とき",m:"때·시",ex:"時間",exr:"じかん / 시간"},
+ {k:"分",on:"フン・ブン",kun:"わ(かる)",m:"분·나누다",ex:"分かる",exr:"わかる / 알다"},
+ {k:"半",on:"ハン",kun:"なか(ば)",m:"반",ex:"半分",exr:"はんぶん / 절반"},
+ {k:"毎",on:"マイ",kun:"—",m:"매·마다",ex:"毎日",exr:"まいにち / 매일"},
+ {k:"週",on:"シュウ",kun:"—",m:"주",ex:"今週",exr:"こんしゅう / 이번 주"},
+ {k:"今",on:"コン・キン",kun:"いま",m:"지금",ex:"今",exr:"いま / 지금"},
+ {k:"学",on:"ガク",kun:"まな(ぶ)",m:"배우다",ex:"学生",exr:"がくせい / 학생"},
+ {k:"校",on:"コウ",kun:"—",m:"학교",ex:"学校",exr:"がっこう / 학교"},
+ {k:"生",on:"セイ・ショウ",kun:"い(きる)・う(まれる)・なま",m:"살다·날것",ex:"先生",exr:"せんせい / 선생님"},
+ {k:"先",on:"セン",kun:"さき",m:"먼저",ex:"先週",exr:"せんしゅう / 지난주"},
+ {k:"本",on:"ホン",kun:"もと",m:"책·근본",ex:"日本",exr:"にほん / 일본"},
+ {k:"名",on:"メイ・ミョウ",kun:"な",m:"이름",ex:"名前",exr:"なまえ / 이름"},
+ {k:"何",on:"カ",kun:"なに・なん",m:"무엇",ex:"何",exr:"なに / 무엇"},
+ {k:"私",on:"シ",kun:"わたし",m:"나·저",ex:"私",exr:"わたし / 나"},
+ {k:"友",on:"ユウ",kun:"とも",m:"친구",ex:"友達",exr:"ともだち / 친구"},
+ {k:"食",on:"ショク",kun:"た(べる)",m:"먹다",ex:"食べる",exr:"たべる / 먹다"},
+ {k:"飲",on:"イン",kun:"の(む)",m:"마시다",ex:"飲む",exr:"のむ / 마시다"},
+ {k:"行",on:"コウ・ギョウ",kun:"い(く)・おこな(う)",m:"가다",ex:"行く",exr:"いく / 가다"},
+ {k:"来",on:"ライ",kun:"く(る)",m:"오다",ex:"来る",exr:"くる / 오다"},
+ {k:"見",on:"ケン",kun:"み(る)",m:"보다",ex:"見る",exr:"みる / 보다"},
+ {k:"聞",on:"ブン・モン",kun:"き(く)",m:"듣다·묻다",ex:"聞く",exr:"きく / 듣다"},
+ {k:"言",on:"ゲン・ゴン",kun:"い(う)",m:"말하다",ex:"言う",exr:"いう / 말하다"},
+ {k:"話",on:"ワ",kun:"はな(す)",m:"이야기하다",ex:"話す",exr:"はなす / 말하다"},
+ {k:"読",on:"ドク",kun:"よ(む)",m:"읽다",ex:"読む",exr:"よむ / 읽다"},
+ {k:"書",on:"ショ",kun:"か(く)",m:"쓰다",ex:"書く",exr:"かく / 쓰다"},
+ {k:"立",on:"リツ",kun:"た(つ)",m:"서다",ex:"立つ",exr:"たつ / 서다"},
+ {k:"出",on:"シュツ",kun:"で(る)・だ(す)",m:"나가다·내다",ex:"出る",exr:"でる / 나가다"},
+ {k:"入",on:"ニュウ",kun:"はい(る)・い(れる)",m:"들어가다",ex:"入る",exr:"はいる / 들어가다"},
+ {k:"休",on:"キュウ",kun:"やす(む)",m:"쉬다",ex:"休む",exr:"やすむ / 쉬다"},
+ {k:"高",on:"コウ",kun:"たか(い)",m:"높다·비싸다",ex:"高い",exr:"たかい / 높다"},
+ {k:"安",on:"アン",kun:"やす(い)",m:"싸다·편안",ex:"安い",exr:"やすい / 싸다"},
+ {k:"新",on:"シン",kun:"あたら(しい)",m:"새롭다",ex:"新しい",exr:"あたらしい / 새롭다"},
+ {k:"古",on:"コ",kun:"ふる(い)",m:"오래되다",ex:"古い",exr:"ふるい / 낡다"},
+ {k:"長",on:"チョウ",kun:"なが(い)",m:"길다",ex:"長い",exr:"ながい / 길다"},
+ {k:"多",on:"タ",kun:"おお(い)",m:"많다",ex:"多い",exr:"おおい / 많다"},
+ {k:"少",on:"ショウ",kun:"すく(ない)・すこ(し)",m:"적다",ex:"少し",exr:"すこし / 조금"},
+ {k:"白",on:"ハク",kun:"しろ(い)",m:"희다",ex:"白い",exr:"しろい / 하얗다"},
+ {k:"語",on:"ゴ",kun:"かた(る)",m:"언어",ex:"日本語",exr:"にほんご / 일본어"},
+ {k:"文",on:"ブン・モン",kun:"—",m:"글·문장",ex:"文学",exr:"ぶんがく / 문학"}
+],
+N4: [
+ {k:"会",on:"カイ",kun:"あ(う)",m:"만나다",ex:"会社",exr:"かいしゃ / 회사"},
+ {k:"社",on:"シャ",kun:"—",m:"회사·모임",ex:"会社",exr:"かいしゃ / 회사"},
+ {k:"同",on:"ドウ",kun:"おな(じ)",m:"같다",ex:"同じ",exr:"おなじ / 같다"},
+ {k:"自",on:"ジ・シ",kun:"みずか(ら)",m:"스스로",ex:"自分",exr:"じぶん / 자신"},
+ {k:"工",on:"コウ・ク",kun:"—",m:"공업",ex:"工場",exr:"こうじょう / 공장"},
+ {k:"場",on:"ジョウ",kun:"ば",m:"장소",ex:"場所",exr:"ばしょ / 장소"},
+ {k:"思",on:"シ",kun:"おも(う)",m:"생각하다",ex:"思う",exr:"おもう / 생각하다"},
+ {k:"持",on:"ジ",kun:"も(つ)",m:"들다·가지다",ex:"持つ",exr:"もつ / 가지다"},
+ {k:"待",on:"タイ",kun:"ま(つ)",m:"기다리다",ex:"待つ",exr:"まつ / 기다리다"},
+ {k:"知",on:"チ",kun:"し(る)",m:"알다",ex:"知る",exr:"しる / 알다"},
+ {k:"教",on:"キョウ",kun:"おし(える)",m:"가르치다",ex:"教える",exr:"おしえる / 가르치다"},
+ {k:"習",on:"シュウ",kun:"なら(う)",m:"배우다",ex:"習う",exr:"ならう / 배우다"},
+ {k:"通",on:"ツウ",kun:"とお(る)・かよ(う)",m:"통하다·다니다",ex:"通う",exr:"かよう / 다니다"},
+ {k:"計",on:"ケイ",kun:"はか(る)",m:"재다·계산",ex:"時計",exr:"とけい / 시계"},
+ {k:"楽",on:"ガク・ラク",kun:"たの(しい)",m:"즐겁다·음악",ex:"楽しい",exr:"たのしい / 즐겁다"},
+ {k:"海",on:"カイ",kun:"うみ",m:"바다",ex:"海",exr:"うみ / 바다"},
+ {k:"魚",on:"ギョ",kun:"さかな・うお",m:"물고기",ex:"魚",exr:"さかな / 생선"},
+ {k:"肉",on:"ニク",kun:"—",m:"고기",ex:"肉",exr:"にく / 고기"},
+ {k:"鳥",on:"チョウ",kun:"とり",m:"새",ex:"鳥",exr:"とり / 새"},
+ {k:"牛",on:"ギュウ",kun:"うし",m:"소",ex:"牛肉",exr:"ぎゅうにく / 소고기"},
+ {k:"馬",on:"バ",kun:"うま",m:"말",ex:"馬",exr:"うま / 말"},
+ {k:"茶",on:"チャ・サ",kun:"—",m:"차",ex:"お茶",exr:"おちゃ / 차"},
+ {k:"朝",on:"チョウ",kun:"あさ",m:"아침",ex:"朝",exr:"あさ / 아침"},
+ {k:"昼",on:"チュウ",kun:"ひる",m:"낮·점심",ex:"昼",exr:"ひる / 낮"},
+ {k:"夜",on:"ヤ",kun:"よる・よ",m:"밤",ex:"夜",exr:"よる / 밤"},
+ {k:"春",on:"シュン",kun:"はる",m:"봄",ex:"春",exr:"はる / 봄"},
+ {k:"夏",on:"カ",kun:"なつ",m:"여름",ex:"夏",exr:"なつ / 여름"},
+ {k:"秋",on:"シュウ",kun:"あき",m:"가을",ex:"秋",exr:"あき / 가을"},
+ {k:"冬",on:"トウ",kun:"ふゆ",m:"겨울",ex:"冬",exr:"ふゆ / 겨울"},
+ {k:"赤",on:"セキ",kun:"あか(い)",m:"빨갛다",ex:"赤い",exr:"あかい / 빨갛다"},
+ {k:"青",on:"セイ",kun:"あお(い)",m:"파랗다",ex:"青い",exr:"あおい / 파랗다"},
+ {k:"黒",on:"コク",kun:"くろ(い)",m:"검다",ex:"黒い",exr:"くろい / 검다"},
+ {k:"色",on:"ショク・シキ",kun:"いろ",m:"색",ex:"色",exr:"いろ / 색"},
+ {k:"親",on:"シン",kun:"おや・した(しい)",m:"부모·친하다",ex:"両親",exr:"りょうしん / 부모님"},
+ {k:"強",on:"キョウ",kun:"つよ(い)",m:"강하다",ex:"強い",exr:"つよい / 강하다"},
+ {k:"弱",on:"ジャク",kun:"よわ(い)",m:"약하다",ex:"弱い",exr:"よわい / 약하다"},
+ {k:"明",on:"メイ",kun:"あか(るい)・あ(ける)",m:"밝다",ex:"明るい",exr:"あかるい / 밝다"},
+ {k:"暗",on:"アン",kun:"くら(い)",m:"어둡다",ex:"暗い",exr:"くらい / 어둡다"},
+ {k:"早",on:"ソウ",kun:"はや(い)",m:"이르다",ex:"早い",exr:"はやい / 이르다"},
+ {k:"近",on:"キン",kun:"ちか(い)",m:"가깝다",ex:"近い",exr:"ちかい / 가깝다"},
+ {k:"遠",on:"エン",kun:"とお(い)",m:"멀다",ex:"遠い",exr:"とおい / 멀다"},
+ {k:"重",on:"ジュウ・チョウ",kun:"おも(い)",m:"무겁다",ex:"重い",exr:"おもい / 무겁다"},
+ {k:"軽",on:"ケイ",kun:"かる(い)",m:"가볍다",ex:"軽い",exr:"かるい / 가볍다"},
+ {k:"広",on:"コウ",kun:"ひろ(い)",m:"넓다",ex:"広い",exr:"ひろい / 넓다"},
+ {k:"作",on:"サク・サ",kun:"つく(る)",m:"만들다",ex:"作る",exr:"つくる / 만들다"},
+ {k:"買",on:"バイ",kun:"か(う)",m:"사다",ex:"買う",exr:"かう / 사다"},
+ {k:"売",on:"バイ",kun:"う(る)",m:"팔다",ex:"売る",exr:"うる / 팔다"},
+ {k:"使",on:"シ",kun:"つか(う)",m:"쓰다·사용",ex:"使う",exr:"つかう / 사용하다"},
+ {k:"始",on:"シ",kun:"はじ(める)",m:"시작하다",ex:"始める",exr:"はじめる / 시작하다"},
+ {k:"終",on:"シュウ",kun:"お(わる)",m:"끝나다",ex:"終わる",exr:"おわる / 끝나다"},
+ {k:"歩",on:"ホ",kun:"ある(く)",m:"걷다",ex:"歩く",exr:"あるく / 걷다"},
+ {k:"走",on:"ソウ",kun:"はし(る)",m:"달리다",ex:"走る",exr:"はしる / 달리다"},
+ {k:"泳",on:"エイ",kun:"およ(ぐ)",m:"헤엄치다",ex:"泳ぐ",exr:"およぐ / 수영하다"},
+ {k:"乗",on:"ジョウ",kun:"の(る)",m:"타다",ex:"乗る",exr:"のる / 타다"},
+ {k:"医",on:"イ",kun:"—",m:"의사·의술",ex:"医者",exr:"いしゃ / 의사"},
+ {k:"院",on:"イン",kun:"—",m:"기관·병원",ex:"病院",exr:"びょういん / 병원"},
+ {k:"病",on:"ビョウ",kun:"やまい",m:"병",ex:"病気",exr:"びょうき / 병"},
+ {k:"体",on:"タイ",kun:"からだ",m:"몸",ex:"体",exr:"からだ / 몸"},
+ {k:"頭",on:"トウ・ズ",kun:"あたま",m:"머리",ex:"頭",exr:"あたま / 머리"},
+ {k:"顔",on:"ガン",kun:"かお",m:"얼굴",ex:"顔",exr:"かお / 얼굴"},
+ {k:"心",on:"シン",kun:"こころ",m:"마음",ex:"心",exr:"こころ / 마음"},
+ {k:"町",on:"チョウ",kun:"まち",m:"마을·동네",ex:"町",exr:"まち / 동네"},
+ {k:"村",on:"ソン",kun:"むら",m:"마을",ex:"村",exr:"むら / 마을"},
+ {k:"市",on:"シ",kun:"いち",m:"시·시장",ex:"市民",exr:"しみん / 시민"},
+ {k:"英",on:"エイ",kun:"—",m:"영국·뛰어남",ex:"英語",exr:"えいご / 영어"},
+ {k:"数",on:"スウ",kun:"かず・かぞ(える)",m:"수·세다",ex:"数学",exr:"すうがく / 수학"},
+ {k:"理",on:"リ",kun:"—",m:"이치",ex:"料理",exr:"りょうり / 요리"},
+ {k:"科",on:"カ",kun:"—",m:"과목",ex:"科学",exr:"かがく / 과학"},
+ {k:"試",on:"シ",kun:"こころ(みる)・ため(す)",m:"시험·시도",ex:"試験",exr:"しけん / 시험"},
+ {k:"験",on:"ケン",kun:"—",m:"시험·증험",ex:"試験",exr:"しけん / 시험"},
+ {k:"問",on:"モン",kun:"と(う)",m:"묻다",ex:"問題",exr:"もんだい / 문제"},
+ {k:"答",on:"トウ",kun:"こた(える)",m:"답하다",ex:"答える",exr:"こたえる / 대답하다"},
+ {k:"題",on:"ダイ",kun:"—",m:"제목·문제",ex:"問題",exr:"もんだい / 문제"},
+ {k:"紙",on:"シ",kun:"かみ",m:"종이",ex:"手紙",exr:"てがみ / 편지"},
+ {k:"味",on:"ミ",kun:"あじ",m:"맛",ex:"意味",exr:"いみ / 의미"},
+ {k:"飯",on:"ハン",kun:"めし",m:"밥",ex:"ご飯",exr:"ごはん / 밥"},
+ {k:"料",on:"リョウ",kun:"—",m:"재료·요금",ex:"料理",exr:"りょうり / 요리"},
+ {k:"映",on:"エイ",kun:"うつ(る)",m:"비치다",ex:"映画",exr:"えいが / 영화"},
+ {k:"画",on:"ガ・カク",kun:"—",m:"그림",ex:"映画",exr:"えいが / 영화"},
+ {k:"歌",on:"カ",kun:"うた(う)",m:"노래",ex:"歌",exr:"うた / 노래"},
+ {k:"帰",on:"キ",kun:"かえ(る)",m:"돌아가다",ex:"帰る",exr:"かえる / 돌아가다"},
+ {k:"着",on:"チャク",kun:"き(る)・つ(く)",m:"입다·도착",ex:"着く",exr:"つく / 도착하다"},
+ {k:"送",on:"ソウ",kun:"おく(る)",m:"보내다",ex:"送る",exr:"おくる / 보내다"},
+ {k:"建",on:"ケン",kun:"た(てる)",m:"세우다",ex:"建物",exr:"たてもの / 건물"},
+ {k:"室",on:"シツ",kun:"むろ",m:"방",ex:"教室",exr:"きょうしつ / 교실"},
+ {k:"店",on:"テン",kun:"みせ",m:"가게",ex:"店",exr:"みせ / 가게"},
+ {k:"銀",on:"ギン",kun:"—",m:"은",ex:"銀行",exr:"ぎんこう / 은행"},
+ {k:"図",on:"ズ・ト",kun:"—",m:"그림·도",ex:"図書館",exr:"としょかん / 도서관"},
+ {k:"館",on:"カン",kun:"—",m:"건물·관",ex:"図書館",exr:"としょかん / 도서관"},
+ {k:"曜",on:"ヨウ",kun:"—",m:"요일",ex:"曜日",exr:"ようび / 요일"},
+ {k:"雪",on:"セツ",kun:"ゆき",m:"눈",ex:"雪",exr:"ゆき / 눈"},
+ {k:"風",on:"フウ",kun:"かぜ",m:"바람",ex:"風",exr:"かぜ / 바람"}
+]
+};
+
+/* ===================== 상태 ===================== */
+let level = "N5";
+let mode = "grid";
+let query = "";
+const STORE_KEY = "jlpt_kanji_known_v1";
+let known = JSON.parse(localStorage.getItem(STORE_KEY) || "{}"); // {kanji:true}
+
+function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(known)); }
+function curList(){
+  let arr = DATA[level];
+  if(query){
+    const q = query.toLowerCase();
+    arr = arr.filter(d => d.k.includes(q) || d.m.toLowerCase().includes(q)
+      || d.on.toLowerCase().includes(q) || d.kun.toLowerCase().includes(q)
+      || (d.ex && d.ex.includes(q)));
+  }
+  return arr;
+}
+
+/* ===================== 통계 ===================== */
+function updateStat(){
+  const total = DATA[level].length;
+  const cnt = DATA[level].filter(d => known[d.k]).length;
+  document.getElementById("knownCount").textContent = cnt;
+  document.getElementById("totalCount").textContent = total;
+  document.getElementById("progbar").style.width = (total? (cnt/total*100):0) + "%";
+}
+
+/* ===================== 그리드 렌더 ===================== */
+function renderGrid(){
+  const grid = document.getElementById("grid");
+  const arr = curList();
+  if(!arr.length){ grid.innerHTML = '<div class="empty">검색 결과가 없어요 🔍</div>'; return; }
+  grid.innerHTML = arr.map(d => `
+    <div class="card ${known[d.k]?'known':''}" data-k="${d.k}">
+      <span class="badge ${level}">${level}</span>
+      <span class="chk">✔</span>
+      <div class="kanji">${d.k}</div>
+      <div class="read"><span class="on">音 ${d.on}</span><br><span class="kun">訓 ${d.kun}</span></div>
+      <div class="mean">${d.m}</div>
+      <div class="ex">📝 ${d.ex} <span style="opacity:.7">(${d.exr})</span></div>
+    </div>`).join("");
+  grid.querySelectorAll(".card").forEach(c=>{
+    c.onclick = ()=>{
+      const k = c.dataset.k;
+      known[k] = !known[k];
+      if(!known[k]) delete known[k];
+      save(); c.classList.toggle("known", !!known[k]); updateStat();
+    };
+  });
+}
+
+/* ===================== 플래시카드 ===================== */
+let fcArr = [], fcIdx = 0;
+function initFlash(){
+  fcArr = curList().slice();
+  fcIdx = 0;
+  renderFlash();
+}
+function renderFlash(){
+  if(!fcArr.length){ document.getElementById("fcKanji").textContent="∅"; document.getElementById("fcCount").textContent="0 / 0"; return; }
+  const d = fcArr[fcIdx];
+  document.getElementById("fcCard").classList.remove("flip");
+  document.getElementById("fcKanji").textContent = d.k;
+  document.getElementById("fcMean").textContent = d.m;
+  document.getElementById("fcRead").innerHTML = `<span class="on">音 ${d.on}</span> · <span class="kun">訓 ${d.kun}</span>`;
+  document.getElementById("fcEx").innerHTML = `📝 ${d.ex} (${d.exr})`;
+  document.getElementById("fcCount").textContent = `${fcIdx+1} / ${fcArr.length}`;
+  document.getElementById("fcKnown").textContent = known[d.k] ? "✅ 외운 한자" : "✅ 외웠어요";
+}
+document.getElementById("fcCard").onclick = ()=> document.getElementById("fcCard").classList.toggle("flip");
+document.getElementById("fcNext").onclick = ()=>{ if(!fcArr.length)return; fcIdx=(fcIdx+1)%fcArr.length; renderFlash(); };
+document.getElementById("fcShuffle").onclick = ()=>{ fcArr.sort(()=>Math.random()-0.5); fcIdx=0; renderFlash(); };
+document.getElementById("fcKnown").onclick = ()=>{
+  if(!fcArr.length)return;
+  const k = fcArr[fcIdx].k; known[k]=true; save(); updateStat();
+  fcIdx=(fcIdx+1)%fcArr.length; renderFlash();
+};
+
+/* ===================== 퀴즈 ===================== */
+let qzScore=0, qzTotal=0, qzCur=null;
+function newQuiz(){
+  const arr = DATA[level];
+  if(arr.length<4) return;
+  qzCur = arr[Math.floor(Math.random()*arr.length)];
+  // 오답 3개
+  const opts = [qzCur];
+  while(opts.length<4){
+    const c = arr[Math.floor(Math.random()*arr.length)];
+    if(!opts.find(o=>o.k===c.k)) opts.push(c);
+  }
+  opts.sort(()=>Math.random()-0.5);
+  document.getElementById("qzKanji").textContent = qzCur.k;
+  const box = document.getElementById("qzOpts");
+  box.innerHTML = opts.map(o=>`<button data-k="${o.k}">${o.m}</button>`).join("");
+  box.querySelectorAll("button").forEach(b=>{
+    b.onclick = ()=>{
+      box.querySelectorAll("button").forEach(x=>x.disabled=true);
+      qzTotal++;
+      if(b.dataset.k===qzCur.k){ b.classList.add("correct"); qzScore++; known[qzCur.k]=true; save(); updateStat(); }
+      else{
+        b.classList.add("wrong");
+        box.querySelector(`button[data-k="${qzCur.k}"]`).classList.add("correct");
+      }
+      document.getElementById("qzScore").textContent=qzScore;
+      document.getElementById("qzTotal").textContent=qzTotal;
+      document.getElementById("qzNext").style.visibility="visible";
+    };
+  });
+  document.getElementById("qzNext").style.visibility="hidden";
+}
+document.getElementById("qzNext").onclick = newQuiz;
+
+/* ===================== 모드/레벨 전환 ===================== */
+function applyMode(){
+  document.getElementById("grid").style.display  = mode==="grid"  ? "grid" : "none";
+  document.getElementById("flash").style.display = mode==="flash" ? "flex" : "none";
+  document.getElementById("quiz").style.display  = mode==="quiz"  ? "flex" : "none";
+  if(mode==="grid") renderGrid();
+  if(mode==="flash") initFlash();
+  if(mode==="quiz"){ qzScore=0; qzTotal=0; document.getElementById("qzScore").textContent=0; document.getElementById("qzTotal").textContent=0; newQuiz(); }
+}
+document.getElementById("levelSeg").onclick = (e)=>{
+  const b = e.target.closest("button"); if(!b)return;
+  level = b.dataset.level;
+  [...e.currentTarget.children].forEach(x=>x.classList.toggle("on", x===b));
+  updateStat(); applyMode();
+};
+document.getElementById("modeSeg").onclick = (e)=>{
+  const b = e.target.closest("button"); if(!b)return;
+  mode = b.dataset.mode;
+  [...e.currentTarget.children].forEach(x=>x.classList.toggle("on", x===b));
+  applyMode();
+};
+document.getElementById("search").oninput = (e)=>{
+  query = e.target.value.trim();
+  if(mode==="grid") renderGrid();
+  if(mode==="flash") initFlash();
+};
+document.getElementById("resetBtn").onclick = ()=>{
+  if(!confirm(`${level} 레벨의 외운 표시를 모두 지울까요?`)) return;
+  DATA[level].forEach(d=> delete known[d.k]);
+  save(); updateStat(); applyMode();
+};
+
+/* ===================== 초기화 ===================== */
+updateStat();
+applyMode();
+</script>
+</body>
+</html>

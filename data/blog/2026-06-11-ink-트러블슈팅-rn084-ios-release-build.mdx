@@ -1,0 +1,36 @@
+---
+title: 'RN 0.84 iOS Release 빌드 실패 해결: Expo/RN 네이티브 호환성과 Pods 절대경로'
+date: 2026-06-11
+tags: [React Native, iOS, Xcode, Expo, Hermes, CocoaPods]
+project: INK
+---
+
+## 문제 상황
+
+INK React Native 앱의 iOS Release 빌드를 `xcodebuild -workspace ios/INK.xcworkspace -scheme INK -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build`로 검증하던 중 여러 단계에서 실패했다.
+
+초기 실패는 `expo-constants`의 `PrivacyInfo.xcprivacy` 및 `scripts/get-app-config-ios.sh`를 기존 Pods가 `node_modules/expo/node_modules/expo-constants` 경로에서 찾는 문제였다. 이후 RN 0.84의 iOS 네이티브 API 변경으로 Expo Swift/Objective-C wrapper가 컴파일되지 않았고, 앱 `AppDelegate.swift`의 `React_RCTLinkingManager` import도 실패했다. 마지막으로 JS bundle 단계에서 Hermes compiler 경로가 이전 체크아웃 경로(`/Users/seodong-og/project_vs/plan/...`)를 가리켜 실패했다.
+
+## 원인 분석
+
+- npm hoisting으로 `expo-constants`는 top-level `node_modules/expo-constants`에 존재하지만, 기존 CocoaPods 설정은 nested `node_modules/expo/node_modules/expo-constants`를 참조하고 있었다.
+- RN 0.84에서 `RCTRootViewFactory`의 iOS `viewWithModuleName` 계열 API가 `bundleConfiguration` 인자를 요구하도록 바뀌었고, `devMenuConfiguration`도 non-optional 값으로 전달되어야 했다.
+- `RCTLinkingManager`는 현재 Pods 구성에서 별도 Swift 모듈 `React_RCTLinkingManager`가 아니라 `React` 공개 헤더로 노출되고 있었다.
+- 기존 Pods 파일에 체크아웃 이전 경로가 절대경로로 남아 `HERMES_CLI_PATH`가 잘못 설정되었다.
+
+## 해결 방법
+
+- `scripts/patch-native-modules.js`에 postinstall 패치를 추가했다.
+  - top-level `node_modules/expo-constants`를 `node_modules/expo/node_modules/expo-constants`로 동기화해 기존 Pods 참조를 만족시켰다.
+  - Expo iOS `ExpoReactNativeFactory.swift`, `EXReactRootViewFactory.h/mm` 호출부를 RN 0.84의 `bundleConfiguration` 포함 시그니처에 맞췄다.
+  - `ios/Pods` 내 `HERMES_CLI_PATH`, Expo configure script, local podspec의 이전 절대경로를 현재 프로젝트 루트로 정규화했다.
+- `ios/INK/AppDelegate.swift`에서 더 이상 존재하지 않는 `import React_RCTLinkingManager`를 제거했다.
+- 검증:
+  - `npm run typecheck` 통과
+  - `xcodebuild ... CODE_SIGNING_ALLOWED=NO build` iOS Release generic 빌드 통과
+
+## 배운 점
+
+- CocoaPods 산출물은 절대경로를 포함할 수 있어 프로젝트 경로가 바뀌면 Hermes나 Expo script phase가 깨질 수 있다.
+- RN canary/최신 버전 조합에서는 Expo native wrapper가 RN 네이티브 API 변경을 따라가지 못할 수 있으므로, 업스트림 업데이트 전까지 postinstall 패치를 명확히 분리해 재현 가능하게 관리해야 한다.
+- hoisted node_modules와 Pods의 기존 package 경로 참조가 다르면 iOS 빌드는 Android와 다른 방식으로 실패할 수 있다.

@@ -1,0 +1,87 @@
+---
+title: '타입체크는 통과하는데 앱이 안 켜진다 — .d.ts 스텁이 숨긴 네이티브 모듈 누락'
+date: 2026-06-10
+tags: [React Native, TypeScript, Metro, 트러블슈팅, IAP, 배포]
+project: INK
+---
+
+## 문제 상황
+
+베타 배포를 앞두고 INK 앱(React Native 0.84.1)의 배포 가능 여부를 점검하던 중이었다.
+
+- `tsc --noEmit` → **0 errors, 통과** ✅
+- `jest` → **통과** ✅
+
+지표상으로는 깨끗했다. 그런데 `package.json` / `node_modules`를 직접 확인해 보니, 결제(IAP)와 카카오 로그인 화면에서 **값(value)으로 import하는 네이티브 패키지 두 개가 아예 설치되어 있지 않았다.**
+
+```
+react-native-iap:                      ❌ ABSENT (node_modules + package.json)
+@react-native-seoul/kakao-login:       ❌ ABSENT (node_modules + package.json)
+@invertase/react-native-apple-auth:    🟢 2.5.1 설치됨
+```
+
+`iapService.ts`, `kakaoAuth.ts`는 이 모듈들을 정적 import 하고 있고, 그 코드는 `SubscriptionScreen` / `SenTopUpScreen` / 로그인 화면에 실제로 연결되어 있었다. 즉 **`npm ci` 후 Metro 번들 단계에서 무조건 깨지는** 상태였다. 타입체크와 테스트는 이 사실을 전혀 잡아내지 못했다.
+
+## 원인 분석
+
+핵심 원인은 프로젝트에 손으로 작성한 **타입 스텁** `src/types/native-modules.d.ts`였다.
+
+```ts
+declare module 'react-native-iap' {
+  export function initConnection(): Promise<boolean>
+  export function getProducts(input: { skus: string[] }): Promise<Product[]>
+  export function requestPurchase(input: { sku: string }): Promise<void>
+  // ...
+}
+```
+
+`declare module 'react-native-iap'` 가 존재하면 TypeScript는 **실제 패키지가 node_modules에 없어도** 모듈을 "해석됨"으로 처리한다. 그래서 `TS2307: Cannot find module` 이 발생하지 않는다. 타입 시스템 입장에서는 완벽하게 정상인 코드다.
+
+문제는 런타임/번들 타임이다. **Metro는 .d.ts 스텁을 보지 않는다.** 실제 JS 구현(`node_modules/react-native-iap/lib/...`)을 찾으며, 없으면 번들이 실패한다.
+
+> 정리: `.d.ts`는 타입 레이어, `node_modules`는 런타임 레이어. 스텁만 있고 패키지가 없으면 **"tsc는 통과 / 앱은 번들 실패"** 라는 어긋남이 생긴다.
+
+이 스텁 패턴 자체는 정상적인 관례다. 실제로 같은 파일의 `@invertase/react-native-apple-authentication`는 **스텁 + 실제 패키지 설치**가 공존한다(스텁이 타입을 보강하고, 패키지가 런타임을 제공). 문제는 iap/kakao 두 모듈이 **스텁만 만들어지고 설치 단계를 빠뜨린** 반쪽 상태로 남아 있었던 것이다.
+
+## 해결 방법
+
+먼저 스텁 시그니처와 실제 패키지의 API가 일치하는 버전을 골라야 했다. `react-native-iap`는 최신(15.x)이 nitro-modules 기반의 **다른 API**라, 기존 코드(`getProducts({skus})`, `requestPurchase({sku})`)와 맞는 **v12 클래식 API**를 설치해야 했다.
+
+```bash
+npm install --save \
+  react-native-iap@^12.16.4 \
+  @react-native-seoul/kakao-login@^5.4.2 \
+  --legacy-peer-deps
+```
+
+설치 후 검증:
+
+```bash
+# 1. 패키지 등록 확인
+node -e "const d=require('./package.json').dependencies; \
+  console.log(d['react-native-iap'], d['@react-native-seoul/kakao-login'])"
+# ^12.16.4 ^5.4.2
+
+# 2. 실제 패키지가 코드가 쓰는 함수를 export 하는지 확인 (스텁이 아닌 진짜 JS)
+node -e "const fs=require('fs'); \
+  const src=fs.readFileSync(require.resolve('react-native-iap'),'utf8'); \
+  /* 배럴 re-export까지 추적해서 initConnection/getProducts/... 존재 확인 */"
+
+# 3. 타입체크 + 테스트
+npx tsc --noEmit --project tsconfig.app.json   # 0 errors
+npx jest                                        # pass
+```
+
+스텁은 그대로 두었다(apple-auth와 동일하게 스텁+패키지 공존 = 이 repo의 확립된 관례). 네이티브 링크(`cd ios && pod install`, gradle)는 개발 머신의 빌드 단계에서 별도로 수행해야 한다 — JS 번들 차단은 이 설치로 해소됐다.
+
+설치 중 `co@4.6.0 EINTEGRITY` (npm 캐시 무결성 오류)가 한 번 났는데, `npm cache clean --force` 후 재시도로 해결됐다.
+
+## 배운 점
+
+1. **"tsc 통과 = 빌드 안전"이 아니다.** 특히 RN에서 `declare module`로 손수 만든 스텁이 있으면, 타입 통과는 패키지 설치 여부를 보장하지 않는다. 배포 전 점검은 `tsc`/`jest`만 믿지 말고 **node_modules에 실제 패키지가 있는지**까지 봐야 한다.
+
+2. **스텁을 만들면 설치도 같은 커밋에서 끝내라.** "스텁만 / 설치 안 함" 의 반쪽 상태는 타입체크에 가려져 배포 직전까지 잠복하는 시한폭탄이 된다.
+
+3. **네이티브 패키지는 버전이 곧 API다.** import한 함수 시그니처(`getProducts({skus})` 같은)를 기준으로 메이저 버전을 역산해서 골라야 한다. 무지성 `@latest`는 기존 코드를 더 크게 깨뜨릴 수 있다.
+
+4. 배포 직전 점검 체크 한 줄을 CI에 넣어두면 좋다 — 소스가 import하는 모듈이 전부 `package.json`에 선언돼 있는지 검사(예: `eslint-plugin-import`의 `no-unresolved` 또는 `depcheck`)하면 이런 누락을 타입체크가 아니라 **린트 단계에서** 잡을 수 있다.

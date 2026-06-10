@@ -1,0 +1,158 @@
+---
+title: '자주 나오는 가타카나 단어표 — 외래어·일상어 빈출 정리'
+date: '2026-06-11'
+tags: ['japanese', 'katakana', 'vocabulary', 'loanwords', 'japanese-study', 'jlpt-n5']
+draft: false
+summary: '일본어 초급에서 자주 나오는 가타카나 외래어를 음식, 생활, IT, 교통, 장소, 사람, 쇼핑 주제별로 정리했다. 검색 가능한 표와 장음·촉음 읽기 포인트를 함께 제공한다.'
+category: japan
+---
+
+가타카나를 외웠다면 다음 단계는 **가타카나 단어**다.  
+일본어 일상에서는 カメラ, コーヒー, コンビニ, パソコン처럼 외래어가 매우 자주 나온다.
+
+이 글은 초급자가 먼저 외우면 좋은 가타카나 단어를 주제별로 정리한 자료다.
+
+## 검색 가능한 가타카나 단어표
+
+<InteractiveHTML
+  title="자주 나오는 가타카나 단어표"
+  height={720}
+  html={`<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#fff; color:#18181b; }
+  .wrap { padding:22px; }
+  h1 { margin:0 0 8px; font-size:24px; }
+  .desc { color:#71717a; line-height:1.6; }
+  input { width:100%; box-sizing:border-box; border:1px solid #d4d4d8; border-radius:14px; padding:13px 14px; font-size:16px; margin:14px 0; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; }
+  .card { border:1px solid #e4e4e7; border-radius:18px; padding:15px; background:#fafafa; }
+  .jp { font-size:26px; font-weight:900; }
+  .read { color:#52525b; margin-top:4px; }
+  .ko { margin-top:8px; font-weight:700; }
+  .cat { display:inline-block; margin-top:10px; font-size:12px; color:#0369a1; background:#e0f2fe; border-radius:999px; padding:4px 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>가타카나 빈출 단어</h1>
+  <p class="desc">한국어 뜻, 일본어 표기, 분류로 검색할 수 있습니다. 장음 ー와 촉음 ッ에 주의하세요.</p>
+  <input id="q" placeholder="예: 커피, コンビニ, IT, 호텔" />
+  <div id="cards" class="cards"></div>
+</div>
+<script>
+const words = [
+ ['コーヒー','koohii','커피','음식'],['パン','pan','빵','음식'],['ケーキ','keeki','케이크','음식'],['チョコレート','chokoreeto','초콜릿','음식'],['カレー','karee','카레','음식'],['ラーメン','raamen','라멘','음식'],['サラダ','sarada','샐러드','음식'],['ジュース','juusu','주스','음식'],['ビール','biiru','맥주','음식'],
+ ['テレビ','terebi','텔레비전','생활'],['ラジオ','rajio','라디오','생활'],['カメラ','kamera','카메라','생활'],['ベッド','beddo','침대','생활'],['テーブル','teeburu','테이블','생활'],['ドア','doa','문','생활'],['トイレ','toire','화장실','생활'],['エアコン','eakon','에어컨','생활'],
+ ['パソコン','pasokon','컴퓨터','IT'],['スマホ','sumaho','스마트폰','IT'],['メール','meeru','메일','IT'],['アプリ','apuri','앱','IT'],['サイト','saito','사이트','IT'],['ネット','netto','인터넷','IT'],['パスワード','pasuwaado','비밀번호','IT'],['データ','deeta','데이터','IT'],
+ ['バス','basu','버스','교통'],['タクシー','takushii','택시','교통'],['ホテル','hoteru','호텔','장소'],['コンビニ','konbini','편의점','장소'],['スーパー','suupaa','슈퍼마켓','장소'],['レストラン','resutoran','레스토랑','장소'],['デパート','depaato','백화점','장소'],
+ ['カード','kaado','카드','쇼핑'],['レシート','reshiito','영수증','쇼핑'],['サイズ','saizu','사이즈','쇼핑'],['セール','seeru','세일','쇼핑'],['ブランド','burando','브랜드','쇼핑'],
+ ['アルバイト','arubaito','아르바이트','사람/일'],['スタッフ','sutaffu','스태프','사람/일'],['チーム','chiimu','팀','사람/일'],['マネージャー','maneejaa','매니저','사람/일'],['スケジュール','sukejuuru','스케줄','사람/일']
+];
+const q = document.getElementById('q');
+const cards = document.getElementById('cards');
+function render(){
+  const key = q.value.trim().toLowerCase();
+  const filtered = words.filter(function(w){ return (w[0]+' '+w[1]+' '+w[2]+' '+w[3]).toLowerCase().indexOf(key) >= 0; });
+  cards.innerHTML = filtered.map(function(w){ return '<div class="card"><div class="jp">'+w[0]+'</div><div class="read">'+w[1]+'</div><div class="ko">'+w[2]+'</div><span class="cat">'+w[3]+'</span></div>'; }).join('');
+}
+q.addEventListener('input', render);
+render();
+</script>
+</body>
+</html>`}
+/>
+
+---
+
+## 음식·음료
+
+| 가타카나     | 읽기       | 뜻     |
+| ------------ | ---------- | ------ |
+| コーヒー     | koohii     | 커피   |
+| パン         | pan        | 빵     |
+| ケーキ       | keeki      | 케이크 |
+| チョコレート | chokoreeto | 초콜릿 |
+| カレー       | karee      | 카레   |
+| ラーメン     | raamen     | 라멘   |
+| サラダ       | sarada     | 샐러드 |
+| ジュース     | juusu      | 주스   |
+| ビール       | biiru      | 맥주   |
+
+## 생활용품·집
+
+| 가타카나 | 읽기    | 뜻     |
+| -------- | ------- | ------ |
+| テレビ   | terebi  | TV     |
+| ラジオ   | rajio   | 라디오 |
+| カメラ   | kamera  | 카메라 |
+| ベッド   | beddo   | 침대   |
+| テーブル | teeburu | 테이블 |
+| ドア     | doa     | 문     |
+| トイレ   | toire   | 화장실 |
+| エアコン | eakon   | 에어컨 |
+
+## IT·업무
+
+| 가타카나   | 읽기      | 뜻       |
+| ---------- | --------- | -------- |
+| パソコン   | pasokon   | 컴퓨터   |
+| スマホ     | sumaho    | 스마트폰 |
+| メール     | meeru     | 메일     |
+| アプリ     | apuri     | 앱       |
+| サイト     | saito     | 사이트   |
+| ネット     | netto     | 인터넷   |
+| パスワード | pasuwaado | 비밀번호 |
+| データ     | deeta     | 데이터   |
+
+## 장소·이동
+
+| 가타카나   | 읽기      | 뜻       |
+| ---------- | --------- | -------- |
+| バス       | basu      | 버스     |
+| タクシー   | takushii  | 택시     |
+| ホテル     | hoteru    | 호텔     |
+| コンビニ   | konbini   | 편의점   |
+| スーパー   | suupaa    | 슈퍼마켓 |
+| レストラン | resutoran | 레스토랑 |
+| デパート   | depaato   | 백화점   |
+
+## 읽기 포인트
+
+### 1. 장음 ー
+
+`ー`는 앞 모음을 길게 읽는다.
+
+- コーヒー: 코오히이
+- ケーキ: 케에키
+- タクシー: 타쿠시이
+- スーパー: 수우파아
+
+한국어처럼 짧게 읽으면 일본어에서는 다른 단어처럼 들릴 수 있다.
+
+### 2. 촉음 ッ
+
+작은 `ッ`는 한 박자 멈추는 소리다.
+
+- ベッド: 벳도
+- ネット: 넷토
+- スタッフ: 스탓후
+
+### 3. V 발음은 バ행으로 바뀌는 경우가 많다
+
+일본어에는 원래 v 발음이 약하기 때문에 バ行으로 들어오는 단어가 많다.
+
+- violin → バイオリン
+- video → ビデオ
+
+## 마무리
+
+가타카나 단어는 영어와 비슷해 보여도 일본어식 발음으로 완전히 바뀐다.  
+따라서 철자보다 **소리의 박자**를 익히는 것이 중요하다.
+
+- 장음 ー는 길게
+- 촉음 ッ는 한 박자 멈추기
+- コンビニ, パソコン처럼 일본식 축약어는 따로 외우기

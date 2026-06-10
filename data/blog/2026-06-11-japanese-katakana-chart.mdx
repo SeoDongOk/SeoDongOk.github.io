@@ -1,0 +1,148 @@
+---
+title: '가타카나 표 — ア부터ン까지 발음·획순 감각 정리'
+date: '2026-06-11'
+tags: ['japanese', 'katakana', 'kana', 'japanese-study', 'jlpt-n5']
+draft: false
+summary: '일본어 가타카나 46자를 아행부터 와행까지 표로 정리했다. 히라가나 대응, 발음 포인트, 헷갈리는 글자 구분법과 클릭형 학습표를 함께 제공한다.'
+category: japan
+---
+
+가타카나(片仮名)는 일본어의 표음문자 중 하나로, 주로 **외래어, 외국 이름, 의성어·의태어, 강조 표현**에 사용된다.
+
+히라가나를 먼저 외웠다면 가타카나는 모양만 새로 익히면 된다. 발음 체계는 같다.
+
+## 클릭해서 보는 가타카나 표
+
+<InteractiveHTML
+  title="가타카나 46자 표"
+  height={680}
+  html={`<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#111827; color:white; }
+  .wrap { padding:22px; }
+  h1 { margin:0 0 10px; font-size:24px; }
+  p { color:#d1d5db; }
+  .grid { display:grid; grid-template-columns:repeat(5, minmax(54px, 1fr)); gap:10px; max-width:620px; }
+  .cell { border:1px solid #374151; border-radius:16px; padding:14px 8px; background:#1f2937; text-align:center; cursor:pointer; min-height:70px; }
+  .cell:hover, .cell.active { background:#f97316; border-color:#fb923c; }
+  .kana { font-size:34px; font-weight:800; line-height:1; }
+  .romaji { margin-top:8px; color:#d1d5db; font-size:13px; }
+  .panel { margin-top:18px; padding:18px; border-radius:18px; background:#f9fafb; color:#111827; max-width:620px; }
+  .big { font-size:64px; font-weight:900; }
+  .muted { color:#6b7280; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>가타카나 46자</h1>
+  <p>글자를 누르면 히라가나 대응과 발음 힌트를 볼 수 있습니다.</p>
+  <div id="grid" class="grid"></div>
+  <div class="panel" id="panel"></div>
+</div>
+<script>
+const data = [
+ ['ア','あ','a','아'],['イ','い','i','이'],['ウ','う','u','우'],['エ','え','e','에'],['オ','お','o','오'],
+ ['カ','か','ka','카'],['キ','き','ki','키'],['ク','く','ku','쿠'],['ケ','け','ke','케'],['コ','こ','ko','코'],
+ ['サ','さ','sa','사'],['シ','し','shi','시'],['ス','す','su','스'],['セ','せ','se','세'],['ソ','そ','so','소'],
+ ['タ','た','ta','타'],['チ','ち','chi','치'],['ツ','つ','tsu','츠'],['テ','て','te','테'],['ト','と','to','토'],
+ ['ナ','な','na','나'],['ニ','に','ni','니'],['ヌ','ぬ','nu','누'],['ネ','ね','ne','네'],['ノ','の','no','노'],
+ ['ハ','は','ha','하'],['ヒ','ひ','hi','히'],['フ','ふ','fu','후'],['ヘ','へ','he','헤'],['ホ','ほ','ho','호'],
+ ['マ','ま','ma','마'],['ミ','み','mi','미'],['ム','む','mu','무'],['メ','め','me','메'],['モ','も','mo','모'],
+ ['ヤ','や','ya','야'],['ユ','ゆ','yu','유'],['ヨ','よ','yo','요'],
+ ['ラ','ら','ra','라'],['リ','り','ri','리'],['ル','る','ru','루'],['レ','れ','re','레'],['ロ','ろ','ro','로'],
+ ['ワ','わ','wa','와'],['ヲ','を','wo/o','오'],['ン','ん','n','응/ㄴ']
+];
+const tips = {'シ':'シ는 점 두 개와 긴 선이 아래에서 위로 올라가는 느낌입니다. ツ와 자주 헷갈립니다.','ツ':'ツ는 점 두 개와 긴 선이 위에서 아래로 내려가는 느낌입니다. シ와 구분하세요.','ソ':'ソ는 한 획 느낌, ン과 헷갈리기 쉽습니다.','ン':'ン은 아래에서 위로 올라가는 느낌입니다. ソ와 구분하세요.','フ':'フ는 영어 f 계열이지만 한국어 후에 가깝게 들립니다.','ヲ':'현대 일본어에서는 주로 조사 を의 가타카나 표기로만 봅니다.'};
+const grid = document.getElementById('grid');
+const panel = document.getElementById('panel');
+function show(i){
+  const x = data[i];
+  Array.from(grid.children).forEach(function(c, idx){ c.className = 'cell ' + (idx===i?'active':''); });
+  panel.innerHTML = '<div class="big">'+x[0]+'</div><div>히라가나: <strong>'+x[1]+'</strong></div><div>로마자: <strong>'+x[2]+'</strong></div><div>한국어 발음 감각: <strong>'+x[3]+'</strong></div><p class="muted">'+(tips[x[0]] || '히라가나 '+x[1]+'와 같은 소리입니다. 단어 속에서 반복해서 익히세요.')+'</p>';
+}
+data.forEach(function(x,i){
+  const d = document.createElement('button');
+  d.className = 'cell';
+  d.innerHTML = '<div class="kana">'+x[0]+'</div><div class="romaji">'+x[2]+'</div>';
+  d.onclick = function(){ show(i); };
+  grid.appendChild(d);
+});
+show(0);
+</script>
+</body>
+</html>`}
+/>
+
+---
+
+## 기본 오십음도 표
+
+|      | a   | i   | u   | e   | o   |
+| ---- | --- | --- | --- | --- | --- |
+| あ행 | ア  | イ  | ウ  | エ  | オ  |
+| か행 | カ  | キ  | ク  | ケ  | コ  |
+| さ행 | サ  | シ  | ス  | セ  | ソ  |
+| た행 | タ  | チ  | ツ  | テ  | ト  |
+| な행 | ナ  | ニ  | ヌ  | ネ  | ノ  |
+| は행 | ハ  | ヒ  | フ  | ヘ  | ホ  |
+| ま행 | マ  | ミ  | ム  | メ  | モ  |
+| や행 | ヤ  |     | ユ  |     | ヨ  |
+| ら행 | ラ  | リ  | ル  | レ  | ロ  |
+| わ행 | ワ  |     |     |     | ヲ  |
+| ん   | ン  |     |     |     |     |
+
+## 탁음·반탁음
+
+| 행   | 기본           | 탁음/반탁음                     |
+| ---- | -------------- | ------------------------------- |
+| カ行 | カ キ ク ケ コ | ガ ギ グ ゲ ゴ                  |
+| サ行 | サ シ ス セ ソ | ザ ジ ズ ゼ ゾ                  |
+| タ行 | タ チ ツ テ ト | ダ ヂ ヅ デ ド                  |
+| ハ行 | ハ ヒ フ ヘ ホ | バ ビ ブ ベ ボ / パ ピ プ ペ ポ |
+
+## 요음
+
+작은 ャ・ュ・ョ를 붙여 한 박자로 읽는다.
+
+| 계열 | 예시             |
+| ---- | ---------------- |
+| キャ | キャ, キュ, キョ |
+| シャ | シャ, シュ, ショ |
+| チャ | チャ, チュ, チョ |
+| ニャ | ニャ, ニュ, ニョ |
+| ヒャ | ヒャ, ヒュ, ヒョ |
+| ミャ | ミャ, ミュ, ミョ |
+| リャ | リャ, リュ, リョ |
+
+## 헷갈리는 가타카나
+
+### シ vs ツ
+
+- シ: 점과 선이 **옆으로 누운 느낌**, 아래에서 위로 흐른다.
+- ツ: 점과 선이 **세로로 선 느낌**, 위에서 아래로 흐른다.
+
+예시:
+
+- システム: 시스템
+- ツアー: 투어
+
+### ソ vs ン
+
+- ソ: 위에서 아래로 떨어지는 느낌
+- ン: 아래에서 위로 올라가는 느낌
+
+예시:
+
+- ソース: 소스
+- パン: 빵
+
+## 가타카나를 빨리 외우는 방법
+
+1. 히라가나와 같은 발음끼리 짝지어 외운다. ア=あ, カ=か.
+2. 외래어 단어로 외운다. カメラ, テレビ, コーヒー.
+3. 헷갈리는 글자는 따로 묶어 비교한다. シ/ツ, ソ/ン.
+4. 손으로 3번씩 써 본다. 가타카나는 각진 모양이라 획 방향 감각이 중요하다.

@@ -1,0 +1,161 @@
+---
+title: '자주 나오는 일본어 한자 단어 — N5·N4 빈출 어휘 정리'
+date: '2026-06-11'
+tags: ['japanese', 'kanji', 'vocabulary', 'japanese-study', 'jlpt-n5', 'jlpt-n4']
+draft: false
+summary: '일본어 초급에서 자주 나오는 한자 단어를 사람, 시간, 장소, 학교, 생활, 동사, 형용사 주제별로 정리했다. 검색 가능한 인터랙티브 표와 예문을 함께 제공한다.'
+category: japan
+---
+
+일본어 한자는 글자 하나만 외우면 금방 잊힌다.  
+반대로 **단어 단위**로 외우면 읽는 법, 의미, 사용 상황이 같이 기억된다.
+
+이 글은 JLPT N5~N4 초급 학습자가 자주 만나는 한자 단어를 주제별로 정리한 자료다.
+
+## 검색 가능한 한자 단어표
+
+아래 표에서 한국어 뜻, 일본어, 읽는 법으로 검색할 수 있다.
+
+<InteractiveHTML
+  title="자주 나오는 일본어 한자 단어 검색표"
+  height={720}
+  html={`<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:#292524; background:#f8fafc; }
+  .wrap { padding:22px; }
+  h1 { margin:0 0 12px; font-size:24px; }
+  input { width:100%; box-sizing:border-box; padding:13px 14px; border:1px solid #cbd5e1; border-radius:14px; font-size:16px; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0; }
+  .chip { border:1px solid #cbd5e1; background:white; border-radius:999px; padding:8px 12px; cursor:pointer; }
+  .chip.active { background:#0f172a; color:white; border-color:#0f172a; }
+  table { width:100%; border-collapse:collapse; background:white; overflow:hidden; border-radius:16px; box-shadow:0 1px 6px rgba(15,23,42,.08); }
+  th,td { padding:11px; border-bottom:1px solid #e2e8f0; text-align:left; }
+  th { background:#e0f2fe; color:#075985; }
+  .kanji { font-size:22px; font-weight:800; }
+  .small { color:#64748b; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>빈출 한자 단어 검색</h1>
+  <input id="q" placeholder="예: 학교, 時間, じかん, 먹다" />
+  <div id="chips" class="chips"></div>
+  <table>
+    <thead><tr><th>단어</th><th>읽기</th><th>뜻</th><th>분류</th></tr></thead>
+    <tbody id="body"></tbody>
+  </table>
+</div>
+<script>
+const words = [
+ ['日本','にほん','일본','국가'],['韓国','かんこく','한국','국가'],['中国','ちゅうごく','중국','국가'],['外国','がいこく','외국','국가'],
+ ['学生','がくせい','학생','사람'],['先生','せんせい','선생님','사람'],['友達','ともだち','친구','사람'],['会社員','かいしゃいん','회사원','사람'],['医者','いしゃ','의사','사람'],['家族','かぞく','가족','사람'],
+ ['今日','きょう','오늘','시간'],['明日','あした','내일','시간'],['昨日','きのう','어제','시간'],['毎日','まいにち','매일','시간'],['時間','じかん','시간','시간'],['午前','ごぜん','오전','시간'],['午後','ごご','오후','시간'],['今週','こんしゅう','이번 주','시간'],['来週','らいしゅう','다음 주','시간'],
+ ['学校','がっこう','학교','장소'],['大学','だいがく','대학교','장소'],['会社','かいしゃ','회사','장소'],['駅','えき','역','장소'],['空港','くうこう','공항','장소'],['図書館','としょかん','도서관','장소'],['病院','びょういん','병원','장소'],['銀行','ぎんこう','은행','장소'],
+ ['電車','でんしゃ','전철','교통'],['自転車','じてんしゃ','자전거','교통'],['車','くるま','차','교통'],['地下鉄','ちかてつ','지하철','교통'],
+ ['勉強','べんきょう','공부','학교'],['宿題','しゅくだい','숙제','학교'],['試験','しけん','시험','학교'],['授業','じゅぎょう','수업','학교'],['質問','しつもん','질문','학교'],
+ ['食事','しょくじ','식사','생활'],['料理','りょうり','요리','생활'],['写真','しゃしん','사진','생활'],['音楽','おんがく','음악','생활'],['映画','えいが','영화','생활'],['旅行','りょこう','여행','생활'],
+ ['行く','いく','가다','동사'],['来る','くる','오다','동사'],['見る','みる','보다','동사'],['聞く','きく','듣다/묻다','동사'],['話す','はなす','말하다','동사'],['読む','よむ','읽다','동사'],['書く','かく','쓰다','동사'],['買う','かう','사다','동사'],['食べる','たべる','먹다','동사'],['飲む','のむ','마시다','동사'],
+ ['大きい','おおきい','크다','형용사'],['小さい','ちいさい','작다','형용사'],['高い','たかい','높다/비싸다','형용사'],['安い','やすい','싸다','형용사'],['新しい','あたらしい','새롭다','형용사'],['古い','ふるい','오래되다','형용사'],['有名','ゆうめい','유명함','형용사']
+];
+let cat = '전체';
+const cats = ['전체'].concat(Array.from(new Set(words.map(function(w){return w[3];}))));
+const chips = document.getElementById('chips');
+const body = document.getElementById('body');
+const q = document.getElementById('q');
+function drawChips(){
+  chips.innerHTML = cats.map(function(c){ return '<button class="chip '+(c===cat?'active':'')+'" data-cat="'+c+'">'+c+'</button>'; }).join('');
+  Array.from(chips.querySelectorAll('button')).forEach(function(b){ b.onclick = function(){ cat = b.getAttribute('data-cat'); render(); drawChips(); }; });
+}
+function render(){
+  const key = q.value.trim().toLowerCase();
+  const filtered = words.filter(function(w){
+    const inCat = cat === '전체' || w[3] === cat;
+    const text = (w[0]+' '+w[1]+' '+w[2]+' '+w[3]).toLowerCase();
+    return inCat && text.indexOf(key) >= 0;
+  });
+  body.innerHTML = filtered.map(function(w){ return '<tr><td class="kanji">'+w[0]+'</td><td>'+w[1]+'</td><td>'+w[2]+'</td><td><span class="small">'+w[3]+'</span></td></tr>'; }).join('');
+}
+q.addEventListener('input', render);
+drawChips(); render();
+</script>
+</body>
+</html>`}
+/>
+
+---
+
+## 사람·관계
+
+| 단어   | 읽기         | 뜻           |
+| ------ | ------------ | ------------ |
+| 学生   | がくせい     | 학생         |
+| 先生   | せんせい     | 선생님       |
+| 友達   | ともだち     | 친구         |
+| 会社員 | かいしゃいん | 회사원       |
+| 医者   | いしゃ       | 의사         |
+| 家族   | かぞく       | 가족         |
+| 父     | ちち         | 아버지, 부친 |
+| 母     | はは         | 어머니, 모친 |
+| 兄     | あに         | 형, 오빠     |
+| 姉     | あね         | 누나, 언니   |
+| 弟     | おとうと     | 남동생       |
+| 妹     | いもうと     | 여동생       |
+
+## 시간·날짜
+
+| 단어 | 읽기       | 뜻      |
+| ---- | ---------- | ------- |
+| 今日 | きょう     | 오늘    |
+| 明日 | あした     | 내일    |
+| 昨日 | きのう     | 어제    |
+| 毎日 | まいにち   | 매일    |
+| 時間 | じかん     | 시간    |
+| 午前 | ごぜん     | 오전    |
+| 午後 | ごご       | 오후    |
+| 今週 | こんしゅう | 이번 주 |
+| 来週 | らいしゅう | 다음 주 |
+| 今年 | ことし     | 올해    |
+| 来年 | らいねん   | 내년    |
+
+## 장소·기관
+
+| 단어   | 읽기       | 뜻         |
+| ------ | ---------- | ---------- |
+| 学校   | がっこう   | 학교       |
+| 大学   | だいがく   | 대학교     |
+| 会社   | かいしゃ   | 회사       |
+| 駅     | えき       | 역         |
+| 空港   | くうこう   | 공항       |
+| 図書館 | としょかん | 도서관     |
+| 病院   | びょういん | 병원       |
+| 銀行   | ぎんこう   | 은행       |
+| 店     | みせ       | 가게       |
+| 町     | まち       | 마을, 동네 |
+
+## 자주 쓰는 동사 한자 단어
+
+| 단어   | 읽기     | 뜻         |
+| ------ | -------- | ---------- |
+| 行く   | いく     | 가다       |
+| 来る   | くる     | 오다       |
+| 見る   | みる     | 보다       |
+| 聞く   | きく     | 듣다, 묻다 |
+| 話す   | はなす   | 말하다     |
+| 読む   | よむ     | 읽다       |
+| 書く   | かく     | 쓰다       |
+| 買う   | かう     | 사다       |
+| 食べる | たべる   | 먹다       |
+| 飲む   | のむ     | 마시다     |
+| 休む   | やすむ   | 쉬다       |
+| 働く   | はたらく | 일하다     |
+
+## 암기 팁
+
+- 한자 하나씩보다 **단어 단위**로 외운다.
+- 읽기와 뜻을 동시에 말한다. 예: 学校、がっこう、학교.
+- 비슷한 주제끼리 묶는다. 예: 学校, 大学, 授業, 宿題, 試験.
+- 한 단어로 짧은 문장을 만든다. 예: 明日、学校へ行きます。

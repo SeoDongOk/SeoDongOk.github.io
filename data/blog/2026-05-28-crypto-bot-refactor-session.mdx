@@ -1,0 +1,403 @@
+---
+title: '암호화폐 봇 대규모 리팩토링: 동시성 버그 수정부터 WebSocket 안정화까지'
+date: 2026-05-28
+tags: [quantitative-trading, python, binance, algorithm, refactoring, concurrency]
+summary: 'factory 통일, ScalingManager 수수료 버퍼, RLock 레이스컨디션 수정, WebSocket 재연결 안정화 등 55개 테스트로 검증된 전면 리팩토링 세션 기록'
+---
+
+## 배경
+
+최근 암호화폐 자동매매 봇을 운영하면서 손실 규모가 커지고, paper 모드와 live 모드의 동작 차이, Binance API DNS 실패, WebSocket 끊김, 포지션 상태 추적 불일치 같은 문제가 연속적으로 드러났다.
+
+이번 세션의 목표는 단순히 전략 파라미터를 조금 바꾸는 것이 아니라, 실제 운영 중 문제가 될 수 있는 구조적 리스크를 줄이는 것이었다.
+
+핵심 작업 범위는 다음과 같았다.
+
+- 설정 관리 통합
+- 조합 전략 스코어링 개선
+- 포지션 사이징 및 스케일링 안정화
+- 손절/익절 및 일일 손실 제한 검토
+- FuturesTrader 동시성 버그 수정
+- Binance Futures API 재시도 로직 강화
+- WebSocket 재연결 안정화
+- dead code, unused import, 중복 로직 정리
+- pytest 전체 검증
+
+최종적으로 `pytest tests/ -v` 기준 55개 테스트를 통과했다.
+
+```bash
+55 passed, 1 warning
+```
+
+warning은 프로젝트 코드가 아니라 `jupyter_client` 쪽 deprecation warning이었다.
+
+---
+
+## 1. 설정 구조 정리
+
+기존에는 `config/settings.py`와 `strategies/settings.py`가 각각 설정을 들고 있어 설정 드리프트가 발생할 수 있었다.
+
+이번 리팩토링에서는 `strategies/settings.py`를 별도 설정 정의가 아니라 `config.settings`를 re-export하는 호환 모듈로 바꿨다.
+
+이렇게 해서 과거 코드가 아래처럼 import하더라도 동일한 설정 객체를 사용하게 했다.
+
+```python
+from strategies.settings import Settings
+```
+
+실제 설정의 단일 출처는 다음 파일이 되었다.
+
+```text
+config/settings.py
+```
+
+또한 실거래 손실이 커진 상황을 반영해 기본 리스크 값을 더 보수적으로 조정했다.
+
+| 항목               | 기존 | 변경 |
+| ------------------ | ---: | ---: |
+| STOP_LOSS_PCT      | 20.0 | 15.0 |
+| TAKE_PROFIT_PCT    | 50.0 | 30.0 |
+| MAX_DAILY_LOSS_PCT |  5.0 |  3.0 |
+
+쿨다운 관련 설정도 추가했다.
+
+- `COOLDOWN_ENABLED`
+- `STOP_LOSS_COOLDOWN_MINUTES`
+- `CONSECUTIVE_LOSS_COOLDOWN_THRESHOLD`
+- `CONSECUTIVE_LOSS_COOLDOWN_MINUTES`
+
+손절 직후 바로 재진입하거나, 연속 손실 후 같은 방향으로 계속 진입하는 흐름을 막기 위한 목적이다.
+
+---
+
+## 2. 조합 전략 스코어링 개선
+
+`strategies/combination_strategy.py`에서는 combo score 계산 로직과 `signal_strength` 가중치를 다시 검토했다.
+
+기존에는 약한 신호도 높은 전략 가중치를 가지면 전체 점수를 크게 밀어 올릴 수 있었다. 이 구조는 손실 구간에서 매우 위험하다.
+
+이번 변경에서는 `signal_strength_floor`를 “약한 신호 보정”이 아니라 “약한 신호 필터”로 사용했다.
+
+예를 들어 strength가 0.2인 BUY 신호는, 전략 가중치가 높더라도 combo score에 반영하지 않는다.
+
+테스트도 추가했다.
+
+- 약한 신호는 필터링되는지
+- 모든 방향성 신호가 약하면 HOLD가 되는지
+- combo score와 agree count가 의도대로 계산되는지
+
+관련 테스트 파일:
+
+```text
+tests/test_strategies.py
+```
+
+---
+
+## 3. 전략 factory 단일화
+
+`strategies/main_futures.py` 안에는 별도 전략 빌더들이 남아 있었다.
+
+- `_build_weekly_adaptive_strategy`
+- `_build_combination_strategy`
+
+하지만 이미 `strategies/factory.py`에서 설정 기반 전략 생성을 담당하고 있었기 때문에 중복 책임이었다.
+
+이번 정리에서 중복 빌더를 제거하고, 전략 생성 흐름을 아래 기준으로 단일화했다.
+
+```python
+build_strategy(settings)
+```
+
+이 변경으로 전략 생성 경로가 더 명확해졌고, 설정 변경이 여러 경로에서 다르게 반영되는 위험을 줄였다.
+
+---
+
+## 4. ScalingManager 수수료 버퍼와 기준 자본 고정
+
+`core/scaling_manager.py`에서는 분할 진입 시 각 트랜치 계산이 현재 잔고나 변동 상태에 지나치게 흔들릴 수 있는 부분을 점검했다.
+
+이번 변경의 핵심은 다음이다.
+
+1. 최초 `ScalingState.total_capital`을 기준 자본으로 고정
+2. 수수료 버퍼를 반영
+3. 현재 포지션 상태를 외부에서 동기화할 수 있도록 `sync_position_snapshot` 추가
+
+특히 선물 수량 계산에서는 레버리지와 수수료가 결합되기 때문에, 단순히 잔고 전체를 기준으로 수량을 계산하면 실제 주문에서 margin insufficient 문제가 생길 수 있다.
+
+그래서 다음 원칙을 유지했다.
+
+```text
+실제_마진 = balance / (1 + leverage * fee_rate)
+수량 = (실제_마진 * leverage) / price
+```
+
+테스트는 `tests/test_scaling_manager.py`에 추가했다.
+
+---
+
+## 5. FuturesTrader 동시성 버그 수정
+
+가장 중요한 부분은 `core/futures_trader.py`였다.
+
+자동매매 봇에서는 포지션 상태가 여러 흐름에서 동시에 변경될 수 있다.
+
+- 스케줄러 기반 주기 실행
+- WebSocket 이벤트
+- SL/TP 체크
+- 강제 청산
+- 스케일링 추가 진입
+- 수동 종료 또는 오류 복구
+
+기존 구조에서는 내부 포지션 딕셔너리 업데이트와 청산/진입 판단 사이에 race condition 위험이 있었다.
+
+이번 변경에서는 `threading.RLock` 기반 상태 보호 흐름을 추가했다.
+
+주요 개선점은 다음과 같다.
+
+- 동일 심볼 내부 포지션 덮어쓰기 방지
+- `_open_position`, `_open_position_attack`이 성공 여부를 bool로 반환
+- 실거래 청산 실패 시 내부 포지션을 제거하지 않음
+- attack mode 진입 실패 시 카운터 증가 방지
+- 스케일링 실패가 SL/TP 체크를 건너뛰지 않도록 수정
+
+특히 live 모드에서 청산 API가 실패했는데 내부 상태만 삭제되면, 봇은 “포지션 없음”으로 판단하지만 거래소에는 포지션이 남아 있는 치명적인 상태가 된다.
+
+이번에는 청산 실패 시 내부 포지션을 유지해 다음 루프에서 재시도할 수 있게 했다.
+
+관련 테스트:
+
+```text
+tests/test_futures_trader.py
+```
+
+추가한 대표 케이스:
+
+- 손절 후 쿨다운 진입 차단
+- 연속 손실 후 장기 쿨다운 적용
+- 쿨다운 만료 후 재진입 허용
+- 내부 포지션 덮어쓰기 방지
+- live 청산 실패 시 내부 포지션 유지
+- attack mode open 실패 시 상태 오염 방지
+
+---
+
+## 6. RiskManager 손실 제한과 SL/TP 개선
+
+`core/risk_manager.py`에서는 SL/TP 계산과 일일 손실 제한을 검토했다.
+
+개선한 내용은 다음과 같다.
+
+- 일일 손실 제한 경계값에서 신규 진입 차단
+- 미실현 손실을 포함해 일일 손실 제한 판단
+- SHORT 포지션의 intrabar high/low 기반 SL/TP 판단 보강
+- 잘못된 side 값에 대해 `ValueError` 발생
+
+특히 intrabar 판단은 중요하다.
+
+캔들 종가만 보면 손절가나 익절가를 건드렸는지 놓칠 수 있다. 그래서 high/low를 함께 받아 해당 캔들 안에서 SL/TP가 실제로 터졌는지 판단하도록 보강했다.
+
+관련 테스트:
+
+```text
+tests/test_risk_manager.py
+```
+
+---
+
+## 7. Binance Futures API 재시도 로직 강화
+
+`core/futures_client.py`에서는 API 오류 처리와 재시도 로직을 집중적으로 개선했다.
+
+최근 운영 중 발생한 대표 오류는 DNS 실패였다.
+
+```text
+Failed to resolve 'fapi.binance.com'
+```
+
+이런 오류가 발생해도 봇 프로세스가 바로 무너지지 않도록, public REST 호출과 조회성 API에 재시도 로직을 넣었다.
+
+재시도 대상으로 본 오류는 다음과 같다.
+
+- `requests.Timeout`
+- `requests.ConnectionError`
+- `BinanceRequestException`
+- 일시적 `OSError`
+- HTTP 408, 425, 429, 5xx
+- Binance transient code
+  - `-1000`
+  - `-1001`
+  - `-1006`
+  - `-1007`
+  - `-1021`
+
+단, 주문 생성 계열은 다르게 처리했다.
+
+주문 API에 무작정 retry를 걸면 실제로 주문은 체결됐는데 응답만 실패한 경우 중복 주문이 나갈 수 있다. 그래서 시장가 주문 같은 체결성 API는 기본적으로 retry하지 않도록 했다.
+
+관련 테스트:
+
+```text
+tests/test_futures_client_paper.py
+```
+
+테스트한 내용:
+
+- public REST timeout 후 retry 성공
+- market order timeout은 retry하지 않음
+
+---
+
+## 8. WebSocket 재연결 안정화
+
+WebSocket 쪽은 다음 파일을 정리했다.
+
+```text
+core/ws_manager.py
+core/ws_market.py
+```
+
+개선 내용은 다음과 같다.
+
+- 연결 끊김 후 supervisor가 계속 재연결 시도
+- max reconnect 초과 시 완전 종료하지 않고 capped backoff로 유지
+- 기존 ThreadedWebsocketManager 정리 후 재연결
+- market WebSocket에서 mark price가 일정 시간 갱신되지 않으면 stale로 판단 후 재연결
+
+자동매매 봇에서 WebSocket은 단순 편의 기능이 아니라 포지션 상태 추적과 실시간 가격 판단에 영향을 주기 때문에, “끊기면 조용히 죽는 구조”는 위험하다.
+
+이번 작업에서는 끊김 자체를 완전히 막기보다, 끊겼을 때 복구되는 구조에 집중했다.
+
+---
+
+## 9. dead code와 unused import 정리
+
+마지막으로 전체 코드 리뷰를 진행했다.
+
+점검 명령:
+
+```bash
+python -m pyflakes config core strategies
+```
+
+정리한 항목:
+
+- 미사용 import 제거
+- 사용하지 않는 지역 변수 제거
+- 중복 helper 제거
+- 불필요한 TODO/주석 정리
+
+대상 파일 예시:
+
+```text
+core/futures_trader.py
+core/trader.py
+core/scaling_manager.py
+core/risk_manager.py
+strategies/combination_strategy.py
+strategies/supertrend_ema_strategy.py
+strategies/order_block_strategy.py
+strategies/bnf_strategy.py
+strategies/main_futures.py
+```
+
+정리 후 pyflakes는 출력 없이 통과했다.
+
+---
+
+## 10. paper 모드 구동 확인
+
+리팩토링 이후 `main_futures.py`를 paper 모드로 30초 실행했다.
+
+실행 방식:
+
+```bash
+TRADING_MODE=paper python main_futures.py
+```
+
+결과:
+
+```text
+returncode=0
+ran_seconds=30.1
+exited_before_30s=False
+started_ok=True
+```
+
+DNS 실패는 발생했다.
+
+```text
+Failed to resolve 'fapi.binance.com'
+```
+
+하지만 이번 확인의 목적은 네트워크 성공 여부가 아니라 프로세스 구동 자체였다. 봇은 초기화, 분석 루프, 스케줄러 시작까지 진행했고 30초 후 안전하게 종료됐다.
+
+확인된 주요 로그:
+
+```text
+거래 기록 DB 초기화 완료: data/trades.paper.db
+초기 분석 실행 중...
+스케줄러 시작: 1m마다 체크 | 캔들 타임프레임: 15m
+종료 신호 수신 → 봇을 안전하게 종료합니다...
+```
+
+---
+
+## 11. 검증 결과
+
+최종 검증은 두 단계로 진행했다.
+
+### 정적 점검
+
+```bash
+python -m pyflakes config core strategies
+```
+
+결과: 통과
+
+### 테스트
+
+```bash
+pytest tests/ -v
+```
+
+결과:
+
+```text
+55 passed, 1 warning
+```
+
+---
+
+## 배운 점
+
+이번 리팩토링에서 가장 크게 느낀 점은 자동매매 봇에서 전략보다 중요한 것이 “상태 안정성”이라는 점이다.
+
+좋은 전략도 다음 문제가 있으면 실전에서는 위험하다.
+
+- 청산 실패 후 내부 상태만 삭제됨
+- WebSocket이 끊겼는데 복구되지 않음
+- 약한 신호가 높은 가중치 때문에 진입으로 이어짐
+- 손절 직후 바로 같은 심볼에 재진입함
+- 네트워크 실패가 전체 프로세스 실패로 이어짐
+- 설정이 여러 파일에 흩어져 서로 다른 값으로 동작함
+
+이번 작업은 수익률을 바로 높이는 작업이라기보다는, 큰 손실로 이어질 수 있는 구조적 결함을 줄이는 작업이었다.
+
+자동매매 시스템은 “진입 로직”보다 “잘못됐을 때 얼마나 안전하게 멈추거나 복구하는가”가 더 중요하다.
+
+---
+
+## 다음 작업
+
+다음 단계에서는 코드 변경보다 운영 검증이 우선이다.
+
+- paper 모드 장시간 구동
+- DNS 실패 빈도 확인
+- WebSocket 재연결 로그 확인
+- 쿨다운이 실제 손실 후 정상 작동하는지 확인
+- combo score 분포 기록
+- BTCUSDT 단일 심볼 기준 전략 성과 재분석
+- live 복귀 전 최소 며칠간 paper 성과 검증
+
+실거래 복귀는 급하게 하지 않는 것이 맞다. 이번 리팩토링은 방어력을 올린 단계이고, 다음은 paper 모드에서 실제 시장 데이터를 기반으로 전략 품질을 다시 검증하는 단계다.

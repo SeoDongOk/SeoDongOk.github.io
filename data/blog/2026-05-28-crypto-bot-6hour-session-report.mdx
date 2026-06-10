@@ -1,0 +1,212 @@
+---
+title: '암호화폐 봇 6시간 세션 보고서 (2026-05-28)'
+date: 2026-05-28
+tags: [quantitative-trading, python, binance, algorithm, session-report, refactoring]
+summary: '6시간 자율 개발 세션 결과 — 테스트 41→83 pass (+42개), 16개 개선 회차, 핵심 동시성 버그 수정 및 전략 파라미터 최적화'
+---
+
+## 세션 개요
+
+| 항목         | 내용                                                      |
+| ------------ | --------------------------------------------------------- |
+| 시작 시각    | 2026-05-28 01:02                                          |
+| 종료 시각    | 2026-05-28 06:09                                          |
+| 총 작업 시간 | 약 5시간 7분 (서브 1 사용량 한도로 02:39~06:09 일부 중단) |
+| 작업 회차    | 16회                                                      |
+| 테스트 변화  | 41 → 83 pass (+42개, +102%)                               |
+
+---
+
+## 주요 작업 내역
+
+### 1차 — factory 단일화 + 하위전략 누락 수정 (41 → 44 pass)
+
+**문제**: `strategies/main_futures.py`와 `strategies/factory.py`에 전략 생성 경로가 이중으로 존재했음.
+`macd`, `ema_alignment`, `supertrend_ema`, `vwap_reversion` 등이 조합 전략에서 조용히 스킵되는 버그.
+
+**해결**: `main_futures.py` 전략 생성 경로를 `factory.build_strategy(settings)`로 단일화.
+
+### 2차 — combo_score + ScalingManager 수수료 버퍼 개선 (44 → 50 pass)
+
+**개선 내용**:
+
+- 스케일 1트랜치 진입 시 수수료 버퍼 반영
+
+```python
+max_margin_from_balance = available / (1 + leverage * fee_rate)
+first_margin = min(requested_first_margin, max_margin_from_balance)
+```
+
+- ScalingManager 안전장치 5개 추가 (tranche ratio 검증, 포지션 snapshot 동기화 등)
+
+### 3차 — risk_manager SL/TP + settings 단일화 (50 → 53 pass)
+
+**개선 내용**:
+
+- `strategies/settings.py`를 `config.settings` re-export 구조로 변경 (설정 드리프트 제거)
+- 미실현 손실 포함 신규 진입 차단
+- SHORT 포지션 intrabar SL/TP 체크 추가
+
+### 4차 — futures_trader RLock 동시성 버그 수정 (53 → 55 pass)
+
+**핵심 버그**: Mark Price WS worker와 `run_cycle()`이 동시에 `_check_sl_tp()` 또는 `_close_position()`을 호출하는 race condition.
+
+**해결**:
+
+```python
+# 주요 상태 변경 메서드 RLock 적용
+_check_sl_tp(), _close_position(), _partial_close_position()
+_scale_in(), _open_position()
+```
+
+**추가 수정**: 실거래 청산 실패 시 내부 포지션을 보존하도록 변경 (기존: 잘못 삭제됨).
+
+### 5차 — futures_client API 재시도 + WebSocket 안정화 (55 → 57 pass)
+
+**개선 내용**:
+
+- `_call_with_retries()` 모든 API 메서드로 확대 (조건부 주문 포함)
+- Paper 모드 public REST도 재시도 로직 적용 (DNS 실패 복원력)
+- WebSocket 재연결: `max_reconnect` → 경고 기준으로 변경
+- Capped exponential backoff (최대 60초)
+- Market WS 20초 stale 감지 시 자동 재연결
+
+### 6차 — 전체 코드 리뷰 + pyflakes 클린 (55 pass 유지)
+
+- 미사용 import 제거 (4개 파일)
+- 미사용 변수 제거 (5개 파일)
+- `python -m pyflakes config core strategies` 완전 통과
+
+### 7차 — git 커밋 초안 + .gitignore 정리
+
+- 변경사항을 8개 의미 단위로 커밋 분류
+- `.gitignore`에 `data/logs-paper/`, `.ralph-loop/` 추가
+- `=` 빈 파일 삭제
+
+### 8차 — paper trading 구동 확인
+
+```
+returncode=0, ran_seconds=30.1, started_ok=True
+DB 초기화 완료 → 스케줄러 시작 → 안전 종료
+```
+
+### 9차 — 블로그 포스트 작성
+
+`2026-05-28-crypto-bot-refactor-session.mdx` 생성 (12,622 bytes, 431줄)
+
+### 10차 — COMBO_SIGNAL_STRENGTH_FLOOR 0.65 → 0.70
+
+**근거**: 최근 실거래 손실, 레버리지 환경 약신호 비용, threshold 3.0 조합 시 필요 strength ~0.67
+
+### 11차 — 전략 가중치 재조정 (55 pass 유지)
+
+| 전략           | 가중치 | 비고           |
+| -------------- | ------ | -------------- |
+| supertrend_ema | 2.0    | 최고 신호 품질 |
+| ema_alignment  | 1.8    |                |
+| sdo_v2         | 1.5    |                |
+| macd           | 1.0    |                |
+| bollinger      | 0.8    | 보조 전략      |
+| vwap_reversion | 0.8    | 보조 전략      |
+
+### 12차 — attack mode 파라미터 검증 (57 pass)
+
+- 6개 파라미터 유효성 검증 추가
+- 기존 거래소 포지션 있을 시 공격 모드 진입 차단
+- 권장 안전 설정: `ATTACK_LEVERAGE=20, BALANCE_USE_PCT=25~50, MAX_PER_DAY=1`
+
+### 13차 — sdo_strategy 엣지케이스 수정 (62 pass, +5개)
+
+- 5틱 이상 연속 → 마지막 6개 방향 기준으로 패턴 감지
+- 반전 구간 보합 캔들 → HOLD reason
+- `_directions_from_closes()` helper 분리
+- `get_trend_direction()` 비정상 가격 → "알 수 없음" 반환
+
+### 14차 — indicators.py NaN/경계값 방어 (69 pass, +7개)
+
+- `tests/test_indicators.py` 신규 생성 (7개 테스트)
+- RSI 0~100 clip 강제
+- Stochastic flat range → inf 방지 (`denominator.replace(0.0, np.nan)`)
+- Bollinger `std_dev < 0` → ValueError
+
+### 15차 — APScheduler 스케줄러 안정화 (73 pass, +4개)
+
+- `_run_job_safely()` 래퍼 추가 — job 예외 발생 시 스케줄러 중단 방지
+- 전 job에 `max_instances=1, coalesce=True, misfire_grace_time=300` 적용
+- `tests/test_main_futures_scheduler.py` 신규 생성
+
+### 16차 — market_context.py 확장 + CombinationStrategy 연계 (83 pass, +8개)
+
+**추가된 기능**:
+
+- volatility regime 고변동성 감지
+- trend strength BUY/SELL/NEUTRAL 계산
+- `COMBO_VOLATILITY_FILTER_ENABLED`: 고변동성 시 `position_scale_factor = 0.5`
+- `COMBO_TREND_STRENGTH_ENABLED`: 추세 일치 시 +0.3 보너스, NEUTRAL 시 추세 전략 감점
+
+```python
+# Signal 기본 클래스에 추가
+position_scale_factor: float = 1.0
+
+# futures_trader에서 연계
+position_scale_factor = self._get_combo_score_scale_factor(signal)
+position_scale_factor *= signal.position_scale_factor
+position_scale_factor *= self._get_longshort_scale_factor(symbol)
+```
+
+---
+
+## 테스트 성장 추이
+
+```
+41 → 44 → 50 → 53 → 55 → 57 → 62 → 69 → 73 → 81 → 83
+     +3   +6   +3   +2   +2   +5   +7   +4   +8   +2
+총 +42개 (102% 증가)
+```
+
+---
+
+## 코드 변경 통계
+
+```
+26개 파일 수정
+2,428 insertions(+), 847 deletions(-)
+순 증가: +1,581 라인
+```
+
+주요 변경 파일:
+
+- `core/futures_trader.py`: +519 줄 (동시성, 포지션 관리)
+- `strategies/combination_strategy.py`: +471 줄 (market context 연계)
+- `core/futures_client.py`: +405 줄 (재시도, WebSocket)
+- `config/settings.py`: +255 줄 (파라미터 확장)
+
+---
+
+## 핵심 버그 수정
+
+1. **RLock race condition**: Mark Price WS worker + `run_cycle()` 동시 접근으로 포지션 상태 오염
+2. **청산 실패 시 포지션 삭제**: 실거래 청산 주문 실패 시 내부 포지션 잘못 제거
+3. **factory 이중 경로**: 하위 전략이 조용히 스킵되는 silent bug
+
+---
+
+## 전략 파라미터 변경 요약
+
+| 파라미터                    | 변경 전 | 변경 후       | 근거                      |
+| --------------------------- | ------- | ------------- | ------------------------- |
+| COMBO_SIGNAL_STRENGTH_FLOOR | 0.65    | **0.70**      | 레버리지 환경 약신호 비용 |
+| supertrend_ema 가중치       | 1.0     | **2.0**       | 최고 신호 품질            |
+| ema_alignment 가중치        | 1.0     | **1.8**       |                           |
+| COMBO_VOLATILITY_FILTER     | 미존재  | **신규 추가** | 고변동성 포지션 배율 제어 |
+| COMBO_TREND_STRENGTH        | 미존재  | **신규 추가** | 추세 일치 보너스          |
+
+---
+
+## 다음 단계
+
+1. **db/ 분석**: 거래 기록 저장/조회 효율성 개선 (서브 1 재개 필요)
+2. **전략 백테스트 환경 구축**: 파라미터 변경 효과 검증
+3. **Discord 알림 연동 강화**: 실시간 포지션/손익 알림
+4. **실제 라즈베리파이 서버 배포**: paper 모드 안정 확인 후 live 전환 준비
+5. **`=` 파일 등 git 커밋 정리**: 8개 단위 커밋 실제 적용

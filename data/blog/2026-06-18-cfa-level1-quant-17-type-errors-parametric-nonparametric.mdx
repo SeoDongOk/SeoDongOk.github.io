@@ -1,0 +1,104 @@
+---
+title: 'CFA Level 1 Quant 17 — 1종/2종 오류와 모수·비모수 검정'
+date: '2026-06-18'
+tags: ['cfa', 'cfa-level-1', 'quant', 'quantitative-methods', 'hypothesis-testing', 'type-errors']
+draft: false
+summary: 'Type I error, Type II error, 검정력, 모수검정과 비모수검정의 차이를 정리했다.'
+category: misc
+---
+
+> 가설검정은 항상 오류 가능성을 가진다. 중요한 것은 어떤 오류를 얼마나 감수할지 알고, 상황에 맞는 검정 방법을 선택하는 것이다.
+
+## 공식 범위 확인
+
+2027 Quant의 Estimation and Hypothesis Testing 모듈은 Type I error, Type II error, test power를 포함한 가설검정 구성요소와 모수·비모수 검정의 비교를 포함한다.
+
+## Type I error
+
+Type I error는 귀무가설이 참인데도 귀무가설을 기각하는 오류다.
+
+```text
+Type I error = false positive
+```
+
+유의수준 `α`는 Type I error 확률의 허용치로 해석된다.
+
+예를 들어 실제로 펀드 매니저에게 초과성과가 없는데 “초과성과가 있다”고 결론 내리는 경우다.
+
+## Type II error
+
+Type II error는 귀무가설이 거짓인데도 귀무가설을 기각하지 못하는 오류다.
+
+```text
+Type II error = false negative
+```
+
+확률은 `β`로 표시한다.
+
+예를 들어 실제로 초과성과가 있는데 표본에서 충분한 증거를 찾지 못해 “초과성과가 있다고 말할 수 없다”고 결론 내리는 경우다.
+
+## 검정력
+
+검정력은 귀무가설이 거짓일 때 올바르게 기각할 확률이다.
+
+```text
+Power of a test = 1 - β
+```
+
+검정력이 높을수록 실제 효과를 발견할 가능성이 높다.
+
+## α와 β의 trade-off
+
+표본 수가 고정되어 있을 때 Type I error를 줄이면 Type II error가 늘어날 수 있다. 즉, 너무 보수적으로 검정하면 잘못된 긍정은 줄지만 실제 신호를 놓칠 수 있다.
+
+표본 수를 늘리면 두 오류를 동시에 줄이는 데 도움이 된다.
+
+## 모수검정
+
+모수검정은 모집단 분포나 모수에 대한 가정을 둔다.
+
+예:
+
+- 평균에 대한 t-test
+- 분산에 대한 test
+- 회귀계수의 t-test
+
+장점은 가정이 맞을 때 검정력이 좋다는 점이다. 단점은 가정이 틀리면 결과가 왜곡될 수 있다는 점이다.
+
+## 비모수검정
+
+비모수검정은 특정 분포 가정이 약하거나 없다. 순위, 부호, 중앙값 등으로 검정하는 경우가 많다.
+
+장점은 분포 가정에 덜 민감하다는 점이다. 단점은 정보 일부를 버리기 때문에 모수검정보다 검정력이 낮을 수 있다는 점이다.
+
+## 비교표
+
+| 구분        | 모수검정                | 비모수검정           |
+| ----------- | ----------------------- | -------------------- |
+| 분포 가정   | 상대적으로 강함         | 상대적으로 약함      |
+| 사용 데이터 | 평균, 분산 등 수치 정보 | 순위, 부호 등도 가능 |
+| 장점        | 가정 충족 시 강력       | 가정 위반에 강함     |
+| 단점        | 가정 위반에 취약        | 검정력 낮을 수 있음  |
+
+## 오답 포인트
+
+| 오답 포인트                            | 체크 방법                          |
+| -------------------------------------- | ---------------------------------- |
+| Type I/II 오류 반대로 기억             | Type I은 참인 H0를 잘못 기각       |
+| Power를 β로 착각                       | Power = 1 - β                      |
+| α를 낮추면 모든 오류가 감소한다고 생각 | 표본 수 고정 시 β가 증가할 수 있음 |
+| 비모수검정을 무조건 더 좋다고 판단     | 가정과 데이터 특성에 따라 선택     |
+
+## 체크리스트
+
+- [ ] Type I error와 Type II error를 사례로 설명할 수 있다.
+- [ ] 검정력이 `1 - β`임을 안다.
+- [ ] 유의수준을 낮출 때 생기는 trade-off를 설명할 수 있다.
+- [ ] 모수검정과 비모수검정의 차이를 구분할 수 있다.
+
+## 팩트체크 기준
+
+이 글은 공식 교재 문장을 옮긴 것이 아니라, 다음 공식 자료의 범위와 시험 구조를 기준으로 내 언어로 재정리한 학습 노트다.
+
+- [CFA Institute — Level I Exam](https://www.cfainstitute.org/programs/cfa-program/candidate-resources/level-i-exam)
+- [CFA Institute — 2027 Level I Topic Outlines PDF](https://www.cfainstitute.org/sites/default/files/2027levelitopicoutline_online.pdf)

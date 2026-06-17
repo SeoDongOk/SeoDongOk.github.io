@@ -1,0 +1,94 @@
+---
+title: 'CFA Level 1 Quant 전체 로드맵 — 2027 커리큘럼 기준으로 공부 순서 잡기'
+date: '2026-06-18'
+tags: ['cfa', 'cfa-level-1', 'quant', 'quantitative-methods', 'study-plan', 'roadmap']
+draft: false
+summary: '2027 CFA Level I Quantitative Methods의 공식 범위, 비중, 공부 순서, 블로그 시리즈 구성을 정리했다.'
+category: misc
+---
+
+> Quantitative Methods는 CFA Level I에서 비중만 보면 6~9%다. 하지만 수익률, 통계, 가설검정, 포트폴리오 수학, 회귀분석은 다른 과목을 이해하는 기본 언어가 된다. 이 시리즈는 2027년 2월 응시를 목표로 Quant 전체를 블로그 복습용으로 쪼개 정리하는 프로젝트다.
+
+## 공식 범위 확인
+
+CFA Institute의 Level I 안내에 따르면 Quantitative Methods는 Session 1에 포함되고, 시험 비중은 **6~9%**다. Level I 시험은 총 180개 객관식 문항, 135분 세션 2개로 구성되며 모든 문항은 동일 가중치이고 오답 감점이 없다.
+
+2027 Level I Topic Outlines에서 Quant는 다음 큰 모듈로 구성된다.
+
+| 순서 | 모듈                                        | 핵심 질문                                           |
+| ---- | ------------------------------------------- | --------------------------------------------------- |
+| 1    | Returns of Financial Assets and Instruments | 수익률과 요구수익률은 무엇인가                      |
+| 2    | Types of Financial Returns                  | 수익률은 어떤 방식으로 계산되는가                   |
+| 3    | Benchmarking Returns                        | MWR/TWR과 지수 수익률은 어떻게 비교되는가           |
+| 4    | Time Value of Money                         | 미래 현금흐름을 현재가치로 어떻게 바꾸는가          |
+| 5    | Statistical Characteristics                 | 수익률 데이터를 어떻게 요약하는가                   |
+| 6    | Statistical Distributions                   | 확률분포와 기대값을 어떻게 해석하는가               |
+| 7    | Estimation and Hypothesis Testing           | 표본으로 모집단을 어떻게 추론하는가                 |
+| 8    | Portfolio Return and Risk                   | 포트폴리오의 기대수익과 위험은 어떻게 계산되는가    |
+| 9    | Simulation                                  | 불확실한 가격과 수익률을 어떻게 시뮬레이션하는가    |
+| 10   | Simple Linear Regression                    | 두 변수 관계를 어떻게 추정하고 해석하는가           |
+| 11   | Financial Data Science                      | 빅데이터, 머신러닝, AI가 투자분석에 어떻게 쓰이는가 |
+
+## 내가 잡은 22편 구성
+
+공식 모듈 하나를 그대로 한 글로 만들면 너무 길거나 너무 얕아진다. 그래서 이 블로그에서는 Quant 전체를 22편으로 나눈다.
+
+1. 전체 로드맵
+2. 수익률 개념
+3. 요구수익률, 무위험수익률, 위험프리미엄, 인플레이션
+4. 수익률 종류
+5. 연율화, 실질수익률, 명목수익률
+6. Money-weighted return과 Time-weighted return
+7. 지수 산출 방식과 벤치마킹
+8. 현재가치와 미래가치
+9. 연금과 영구연금
+10. 내재수익률과 현금흐름 가산성
+11. 중심경향과 위치
+12. 분산, 왜도, 첨도
+13. 공분산, 상관계수, 세미디비에이션, 변동계수
+14. 확률분포와 기대값
+15. 조건부 기대값과 베이지안 업데이트
+16. 표본, 중심극한정리, 신뢰구간
+17. 가설검정 프레임워크
+18. 1종/2종 오류와 모수/비모수 검정
+19. 포트폴리오 기대수익률과 분산
+20. 효율적 프론티어, CAL, CML
+21. Historical, Bootstrap, Monte Carlo 시뮬레이션
+22. 단순회귀, CAPM beta, 금융 데이터 사이언스
+
+## 공부 순서
+
+나는 다음 순서로 공부할 예정이다.
+
+```text
+수익률 → TVM → 통계 → 확률분포 → 가설검정 → 포트폴리오 수학 → 시뮬레이션 → 회귀분석 → 데이터 사이언스
+```
+
+이 순서가 좋은 이유는 앞부분 개념이 뒤에서 계속 재사용되기 때문이다. 예를 들어 현재가치와 수익률은 Fixed Income과 Equity에서 반복되고, 분산·공분산·상관계수는 Portfolio Management에서 다시 나온다.
+
+## 시험 관점의 우선순위
+
+| 우선순위 | 영역                        | 이유                             |
+| -------- | --------------------------- | -------------------------------- |
+| 1        | 수익률, TVM                 | 거의 모든 자산가치평가의 기본    |
+| 1        | 통계와 확률분포             | 문제풀이 공식이 많고 오답이 잦음 |
+| 1        | 가설검정                    | 용어 구분과 절차 이해가 중요     |
+| 2        | 포트폴리오 수학             | Portfolio Management와 연결      |
+| 2        | 회귀분석                    | CAPM beta 해석과 연결            |
+| 3        | 시뮬레이션, 데이터 사이언스 | 개념 비교 중심                   |
+
+## 이 시리즈의 원칙
+
+- 공식 자료의 범위는 확인하되, 문장은 그대로 옮기지 않는다.
+- 각 글에는 계산식, 해석, 오답 포인트를 함께 둔다.
+- 시험 직전에는 22편을 전부 다시 읽기보다 공식표와 오답 체크리스트만 본다.
+- 계산기는 초반부터 같이 연습한다.
+
+Quant는 비중만 보고 뒤로 미루기 쉬운 과목이다. 하지만 초반에 잡아두면 다른 과목의 진입장벽을 낮춰준다. 이 시리즈는 그 기반을 만드는 용도다.
+
+## 팩트체크 기준
+
+이 글은 공식 교재 문장을 옮긴 것이 아니라, 다음 공식 자료의 범위와 시험 구조를 기준으로 내 언어로 재정리한 학습 노트다.
+
+- [CFA Institute — Level I Exam](https://www.cfainstitute.org/programs/cfa-program/candidate-resources/level-i-exam)
+- [CFA Institute — 2027 Level I Topic Outlines PDF](https://www.cfainstitute.org/sites/default/files/2027levelitopicoutline_online.pdf)

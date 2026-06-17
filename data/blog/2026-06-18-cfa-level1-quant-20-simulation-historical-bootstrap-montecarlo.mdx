@@ -1,0 +1,114 @@
+---
+title: 'CFA Level 1 Quant 20 — Historical, Bootstrap, Monte Carlo 시뮬레이션'
+date: '2026-06-18'
+tags: ['cfa', 'cfa-level-1', 'quant', 'quantitative-methods', 'simulation']
+draft: false
+summary: 'Historical simulation, bootstrap resampling, Monte Carlo simulation의 차이와 투자 활용을 정리했다.'
+category: misc
+---
+
+> 시뮬레이션은 불확실한 미래를 하나의 숫자가 아니라 여러 가능한 경로로 보는 방법이다. CFA Level I에서는 세 가지 방식의 차이를 이해하는 것이 중요하다.
+
+## 공식 범위 확인
+
+2027 Quant의 Simulation 모듈은 historical simulation, bootstrap resampling, Monte Carlo simulation을 설명하고 투자 응용에서 어떻게 쓰이는지 설명하는 내용을 포함한다.
+
+## Historical simulation
+
+Historical simulation은 과거 데이터를 그대로 사용해 미래 결과를 추정한다.
+
+예를 들어 과거 일별 수익률 1,000개를 사용해 포트폴리오 손익 분포를 만들 수 있다.
+
+장점:
+
+- 실제 관측된 데이터 기반
+- 분포 가정이 상대적으로 적음
+- 설명하기 쉬움
+
+단점:
+
+- 과거에 없던 사건을 반영하기 어려움
+- 표본 기간 선택에 민감
+- 구조 변화가 있으면 부정확할 수 있음
+
+## Bootstrap resampling
+
+Bootstrap은 기존 표본에서 복원추출을 반복해 새로운 표본을 만드는 방법이다.
+
+```text
+기존 데이터에서 무작위로 다시 뽑기 → 통계량 계산 → 반복 → 분포 추정
+```
+
+장점:
+
+- 표본이 작을 때 통계량의 불확실성을 파악하는 데 유용
+- 복잡한 분포 가정을 줄일 수 있음
+
+단점:
+
+- 원래 표본이 대표성을 잃으면 bootstrap도 왜곡됨
+- 과거 데이터 범위를 벗어난 사건을 만들기 어려움
+
+## Monte Carlo simulation
+
+Monte Carlo simulation은 확률분포와 모형을 가정하고 무작위 난수를 사용해 많은 가능한 경로를 생성한다.
+
+예:
+
+- 주가 경로 시뮬레이션
+- 옵션 가치평가
+- 은퇴자산 고갈 확률 분석
+- 포트폴리오 손실분포 추정
+
+장점:
+
+- 복잡한 구조를 모델링 가능
+- 다양한 시나리오 생성 가능
+- 비선형 payoff 분석에 유용
+
+단점:
+
+- 가정한 분포와 모형에 민감
+- 계산 비용이 클 수 있음
+- 결과가 그럴듯해 보여도 가정이 틀리면 위험함
+
+## 비교표
+
+| 방식        | 데이터/가정      | 장점                  | 한계                         |
+| ----------- | ---------------- | --------------------- | ---------------------------- |
+| Historical  | 과거 관측치      | 실제 데이터 기반      | 과거에 없는 사건 반영 어려움 |
+| Bootstrap   | 기존 표본 재추출 | 표본 불확실성 파악    | 원표본 품질에 의존           |
+| Monte Carlo | 확률모형과 난수  | 복잡한 미래 경로 생성 | 모형 가정에 민감             |
+
+## 투자 활용
+
+시뮬레이션은 단일 예상수익률보다 분포를 보는 데 유용하다.
+
+- 최악의 5% 손실은 어느 정도인가?
+- 목표수익률을 달성할 확률은 얼마인가?
+- 금리와 주가가 동시에 움직이면 포트폴리오가 어떻게 변하는가?
+
+이런 질문은 평균 하나로 답하기 어렵다.
+
+## 오답 포인트
+
+| 오답 포인트                             | 체크 방법                                        |
+| --------------------------------------- | ------------------------------------------------ |
+| Historical과 Bootstrap 혼동             | Bootstrap은 과거 데이터를 다시 뽑아 새 표본 생성 |
+| Monte Carlo를 실제 과거 데이터라고 착각 | 모형과 난수를 통해 생성한 경로                   |
+| 시뮬레이션 결과를 확정 예측으로 해석    | 결과는 가정하의 가능성 분포                      |
+| 모형 위험 무시                          | 입력 가정이 결과를 지배할 수 있음                |
+
+## 체크리스트
+
+- [ ] Historical simulation의 장단점을 설명할 수 있다.
+- [ ] Bootstrap이 복원추출 기반임을 안다.
+- [ ] Monte Carlo가 확률모형과 난수를 사용한다는 점을 설명할 수 있다.
+- [ ] 시뮬레이션 결과를 확정값이 아니라 분포로 해석한다.
+
+## 팩트체크 기준
+
+이 글은 공식 교재 문장을 옮긴 것이 아니라, 다음 공식 자료의 범위와 시험 구조를 기준으로 내 언어로 재정리한 학습 노트다.
+
+- [CFA Institute — Level I Exam](https://www.cfainstitute.org/programs/cfa-program/candidate-resources/level-i-exam)
+- [CFA Institute — 2027 Level I Topic Outlines PDF](https://www.cfainstitute.org/sites/default/files/2027levelitopicoutline_online.pdf)

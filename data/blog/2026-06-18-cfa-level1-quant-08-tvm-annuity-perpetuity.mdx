@@ -1,0 +1,102 @@
+---
+title: 'CFA Level 1 Quant 08 — 연금과 영구연금 공식 정리'
+date: '2026-06-18'
+tags: ['cfa', 'cfa-level-1', 'quant', 'quantitative-methods', 'time-value-of-money', 'annuity']
+draft: false
+summary: 'Ordinary annuity, annuity due, perpetuity, growing perpetuity의 공식과 해석을 정리했다.'
+category: misc
+---
+
+> 매년 같은 금액을 받는 현금흐름은 하나씩 할인해서 더할 수도 있지만, 공식으로 빠르게 계산할 수 있다. 연금과 영구연금은 CFA 전 과목에서 반복되는 핵심 공식이다.
+
+## 공식 범위 확인
+
+2027 Quant의 TVM 모듈은 미래 현금흐름의 현재가치를 계산하고 해석하는 내용을 포함한다. 연금과 영구연금은 여러 기간 현금흐름을 한 번에 가치평가하는 기본 도구다.
+
+## Ordinary annuity
+
+Ordinary annuity는 매 기간 말에 같은 금액을 받는 구조다.
+
+```text
+PV of ordinary annuity = PMT × [1 - (1 + r)^(-N)] / r
+```
+
+```text
+FV of ordinary annuity = PMT × [(1 + r)^N - 1] / r
+```
+
+대출 상환, 채권 쿠폰, 정기적 저축 같은 문제에서 자주 등장한다.
+
+## Annuity due
+
+Annuity due는 매 기간 초에 현금흐름이 발생한다. Ordinary annuity보다 한 기간 빨리 받기 때문에 가치가 더 크다.
+
+```text
+PV of annuity due = PV of ordinary annuity × (1 + r)
+```
+
+```text
+FV of annuity due = FV of ordinary annuity × (1 + r)
+```
+
+시험에서는 “beginning of each period”인지 “end of each period”인지 반드시 확인해야 한다.
+
+## Perpetuity
+
+Perpetuity는 일정 금액이 영원히 이어지는 현금흐름이다.
+
+```text
+PV of perpetuity = CF / r
+```
+
+예를 들어 매년 5를 영원히 받고 할인율이 5%라면 현재가치는 100이다.
+
+```text
+5 / 0.05 = 100
+```
+
+## Growing perpetuity
+
+현금흐름이 일정 성장률로 영구히 증가하면 growing perpetuity 공식을 사용한다.
+
+```text
+PV of growing perpetuity = CF1 / (r - g)
+```
+
+- `CF1`: 다음 기간 현금흐름
+- `r`: 할인율
+- `g`: 성장률
+
+주의할 점은 `r`이 `g`보다 커야 경제적으로 의미가 있다는 것이다. 또한 분자에는 현재 현금흐름이 아니라 다음 기간 현금흐름 `CF1`이 들어간다.
+
+## 공식 비교
+
+| 유형               | 현금흐름           | 공식 핵심                |
+| ------------------ | ------------------ | ------------------------ |
+| Ordinary annuity   | 기간 말 동일 금액  | 기본 연금 공식           |
+| Annuity due        | 기간 초 동일 금액  | ordinary annuity × (1+r) |
+| Perpetuity         | 영구 동일 금액     | CF / r                   |
+| Growing perpetuity | 영구 성장 현금흐름 | CF1 / (r-g)              |
+
+## 오답 포인트
+
+| 오답 포인트                     | 체크 방법                       |
+| ------------------------------- | ------------------------------- |
+| 기간 초와 기간 말 혼동          | beginning/end 표시              |
+| Growing perpetuity에서 CF0 사용 | 분자는 다음 기간 현금흐름 `CF1` |
+| `r`과 `g` 단위 불일치           | 둘 다 같은 기간 기준인지 확인   |
+| 영구연금 조건 무시              | `r > g` 필요                    |
+
+## 체크리스트
+
+- [ ] Ordinary annuity의 PV/FV 공식을 쓸 수 있다.
+- [ ] Annuity due가 ordinary annuity보다 가치가 큰 이유를 설명할 수 있다.
+- [ ] Perpetuity와 growing perpetuity 공식을 구분할 수 있다.
+- [ ] `CF1`, `r`, `g`의 의미를 정확히 알고 있다.
+
+## 팩트체크 기준
+
+이 글은 공식 교재 문장을 옮긴 것이 아니라, 다음 공식 자료의 범위와 시험 구조를 기준으로 내 언어로 재정리한 학습 노트다.
+
+- [CFA Institute — Level I Exam](https://www.cfainstitute.org/programs/cfa-program/candidate-resources/level-i-exam)
+- [CFA Institute — 2027 Level I Topic Outlines PDF](https://www.cfainstitute.org/sites/default/files/2027levelitopicoutline_online.pdf)

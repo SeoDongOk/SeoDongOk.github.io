@@ -1,0 +1,112 @@
+---
+title: 'CFA Level 1 Quant 04 — 연율화, 명목수익률, 실질수익률'
+date: '2026-06-18'
+tags:
+  ['cfa', 'cfa-level-1', 'quant', 'quantitative-methods', 'returns', 'annualization', 'inflation']
+draft: false
+summary: '기간 수익률을 연율화하고 명목수익률과 실질수익률을 구분하는 방법을 정리했다.'
+category: misc
+---
+
+> 수익률은 기간이 같아야 비교할 수 있다. 3개월 3%와 1년 8%를 그대로 비교하면 안 된다. 이때 필요한 개념이 연율화다.
+
+## 공식 범위 확인
+
+2027 Quant의 수익률 관련 모듈은 금융수익률을 계산·비교·해석하는 내용을 포함한다. 연율화와 실질수익률은 서로 다른 기간과 인플레이션 환경의 수익률을 비교할 때 핵심이다.
+
+## 단순 연율화와 복리 연율화
+
+기간 수익률을 연 단위로 바꾸는 방식은 두 가지로 볼 수 있다.
+
+단순 연율화:
+
+```text
+Annualized return ≈ Period return × 1년 내 기간 수
+```
+
+복리 연율화:
+
+```text
+Annualized return = (1 + period return)^(1년 내 기간 수) - 1
+```
+
+예를 들어 월수익률이 1%라면 단순 연율화는 12%지만, 복리 연율화는 다음이다.
+
+```text
+(1.01)^12 - 1 = 12.68%
+```
+
+시험에서는 문제에서 단순 방식인지 복리 방식인지 확인해야 한다.
+
+## Stated annual rate와 Effective annual rate
+
+명목 연이율이 주어지고 복리 횟수가 함께 주어지는 경우가 있다.
+
+```text
+Effective annual rate = (1 + stated annual rate / m)^m - 1
+```
+
+- `m`: 1년 동안 복리 적용 횟수
+
+예를 들어 stated annual rate가 12%, 월복리라면 effective annual rate는 다음이다.
+
+```text
+(1 + 0.12 / 12)^12 - 1 = 12.68%
+```
+
+같은 stated rate라도 복리 횟수가 많아지면 effective annual rate는 커진다.
+
+## 명목수익률과 실질수익률
+
+명목수익률은 화폐 단위 기준 수익률이고, 실질수익률은 구매력 기준 수익률이다.
+
+```text
+Real return = (1 + nominal return) / (1 + inflation rate) - 1
+```
+
+명목수익률이 6%, 인플레이션이 2%라면:
+
+```text
+1.06 / 1.02 - 1 = 3.92%
+```
+
+낮은 수익률에서는 `명목수익률 - 인플레이션` 근사도 쓸 수 있지만, 정확한 계산은 위 식이다.
+
+## 연속복리 직관
+
+연속복리는 복리 횟수가 무한히 많아지는 경우다.
+
+```text
+Effective return with continuous compounding = e^r - 1
+```
+
+반대로 effective return에서 연속복리 수익률을 구할 때는 자연로그를 사용한다.
+
+```text
+Continuously compounded return = ln(1 + R)
+```
+
+Level I에서는 연속복리 자체보다 단순수익률, 로그수익률, effective rate의 관계를 이해하는 것이 중요하다.
+
+## 오답 포인트
+
+| 오답 포인트                       | 체크 방법                  |
+| --------------------------------- | -------------------------- |
+| 월수익률을 12배만 함              | 복리 연율화 요구 여부 확인 |
+| stated rate와 effective rate 혼동 | 복리 횟수 `m` 확인         |
+| 명목수익률을 실질수익률로 착각    | 인플레이션 제거 여부 확인  |
+| 퍼센트와 소수 혼동                | 계산 전 6%를 0.06으로 변환 |
+
+## 체크리스트
+
+- [ ] 기간 수익률을 복리 기준으로 연율화할 수 있다.
+- [ ] stated annual rate와 effective annual rate를 구분할 수 있다.
+- [ ] 실질수익률 공식을 정확히 쓸 수 있다.
+- [ ] 연속복리 수익률과 로그수익률의 관계를 설명할 수 있다.
+
+## 팩트체크 기준
+
+이 글은 공식 교재 문장을 옮긴 것이 아니라, 다음 공식 자료의 범위와 시험 구조를 기준으로 내 언어로 재정리한 학습 노트다.
+
+- [CFA Institute — Level I Exam](https://www.cfainstitute.org/programs/cfa-program/candidate-resources/level-i-exam)
+- [CFA Institute — 2027 Level I Topic Outlines PDF](https://www.cfainstitute.org/sites/default/files/2027levelitopicoutline_online.pdf)

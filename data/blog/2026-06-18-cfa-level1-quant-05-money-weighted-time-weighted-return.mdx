@@ -1,0 +1,97 @@
+---
+title: 'CFA Level 1 Quant 05 — Money-weighted Return과 Time-weighted Return'
+date: '2026-06-18'
+tags: ['cfa', 'cfa-level-1', 'quant', 'quantitative-methods', 'returns', 'benchmarking']
+draft: false
+summary: 'MWR과 TWR의 차이, 계산 직관, 운용성과 평가에서의 해석을 정리했다.'
+category: misc
+---
+
+> 같은 포트폴리오라도 현금 유입과 유출을 어떻게 처리하느냐에 따라 성과가 다르게 보인다. Money-weighted return과 Time-weighted return은 이 차이를 다루는 핵심 개념이다.
+
+## 공식 범위 확인
+
+2027 Quant의 Benchmarking Returns 모듈은 money-weighted return과 time-weighted return을 계산하고 비교하는 내용을 포함한다. 또한 지수 구성 방식과 지수 수익률 해석도 함께 다룬다.
+
+## Money-weighted return
+
+Money-weighted return, 즉 MWR은 투자자의 실제 현금흐름을 반영한 내부수익률이다.
+
+```text
+MWR = 현금 유입·유출과 기말가치를 현재가치로 맞추는 할인율
+```
+
+즉, MWR은 IRR과 같은 방식으로 생각한다. 투자자가 언제 얼마를 넣고 뺐는지가 결과에 영향을 준다.
+
+MWR이 유용한 경우:
+
+- 개인 투자자의 실제 경험 수익률 측정
+- 현금흐름 타이밍이 투자자 결정인 경우
+- 자금 투입 시점의 영향까지 보고 싶은 경우
+
+## Time-weighted return
+
+Time-weighted return, 즉 TWR은 현금흐름이 발생할 때마다 기간을 나누고, 각 부분기간 수익률을 기하적으로 연결한다.
+
+```text
+TWR = (1 + R1)(1 + R2)...(1 + Rn) - 1
+```
+
+TWR은 외부 현금흐름의 영향을 줄이고 운용자의 성과를 평가하는 데 적합하다.
+
+TWR이 유용한 경우:
+
+- 펀드매니저 성과 평가
+- 벤치마크와 운용성과 비교
+- 투자자가 자금 유입·유출 시점을 통제한 경우
+
+## 간단한 예시
+
+초기 100을 투자하고, 중간에 포트폴리오 가치가 110이 되었다. 이때 100을 추가 투자했고, 기말가치가 220이 되었다고 하자.
+
+부분기간 수익률:
+
+```text
+1기: 100 → 110 = 10%
+2기: 추가 투자 후 210 → 220 = 4.76%
+```
+
+TWR:
+
+```text
+1.10 × 1.0476 - 1 = 15.24%
+```
+
+MWR은 현금흐름의 시점과 크기를 모두 반영한 IRR로 계산된다. 현금흐름이 큰 시점 이후 성과가 좋거나 나쁘면 MWR이 크게 달라질 수 있다.
+
+## MWR vs TWR 비교
+
+| 구분          | MWR                    | TWR                  |
+| ------------- | ---------------------- | -------------------- |
+| 현금흐름 영향 | 큼                     | 제거하려고 함        |
+| 계산 방식     | IRR                    | 부분기간 수익률 연결 |
+| 적합한 용도   | 투자자 실제 성과       | 운용자 성과 평가     |
+| 민감한 요소   | 현금흐름 타이밍과 규모 | 각 기간 수익률       |
+
+## 시험에서 자주 헷갈리는 포인트
+
+| 포인트               | 정리                                   |
+| -------------------- | -------------------------------------- |
+| 운용자 평가          | 보통 TWR이 더 적합                     |
+| 개인 경험 수익률     | MWR이 더 직관적                        |
+| 현금흐름이 없는 경우 | MWR과 TWR 차이가 작거나 같아질 수 있음 |
+| 부분기간 계산        | 현금흐름 발생 시점으로 끊기            |
+
+## 체크리스트
+
+- [ ] MWR이 IRR 개념이라는 점을 설명할 수 있다.
+- [ ] TWR을 부분기간 수익률의 기하 연결로 계산할 수 있다.
+- [ ] 운용자 평가에는 TWR이 적합한 이유를 말할 수 있다.
+- [ ] 투자자 실제 성과에는 MWR이 적합한 이유를 말할 수 있다.
+
+## 팩트체크 기준
+
+이 글은 공식 교재 문장을 옮긴 것이 아니라, 다음 공식 자료의 범위와 시험 구조를 기준으로 내 언어로 재정리한 학습 노트다.
+
+- [CFA Institute — Level I Exam](https://www.cfainstitute.org/programs/cfa-program/candidate-resources/level-i-exam)
+- [CFA Institute — 2027 Level I Topic Outlines PDF](https://www.cfainstitute.org/sites/default/files/2027levelitopicoutline_online.pdf)

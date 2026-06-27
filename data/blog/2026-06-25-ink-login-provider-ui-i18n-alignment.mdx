@@ -1,0 +1,34 @@
+---
+title: 'INK 로그인 Provider UI와 i18n 키 정렬'
+date: 2026-06-25
+tags: [INK, React Native, i18n, login, troubleshooting]
+project: INK
+---
+
+## 문제 상황
+
+INK 앱의 인증 레이어는 Apple, Google 외에도 Kakao, LINE, Zalo, Facebook 흐름을 일부 가지고 있었지만, 실제 로그인 화면에는 Apple과 Google만 노출되고 있었다.  
+즉, 지원하는 인증 방식과 사용자가 보는 UI가 서로 어긋나 있었다.
+
+추가로 provider 라벨을 확장하는 과정에서 다국어 테스트가 실패했다.  
+새로 추가한 로그인 문구가 영어, 한국어, 베트남어 사전 간에 동기화되지 않았기 때문이다.
+
+## 원인 분석
+
+문제는 두 가지였다.
+
+1. `AuthContext`는 여러 provider를 지원했지만, `LoginScreen`은 UI를 Apple/Google에만 고정해두고 있었다.
+2. 새 provider 라벨을 추가하면서 `en`, `ko`, `vi` 로케일의 키 구조를 동일하게 맞추지 못해 i18n 구조 검증 테스트가 깨졌다.
+
+## 해결 방법
+
+- `AuthContext`의 provider 분기에서 Kakao, LINE, Zalo, Facebook 흐름을 모두 연결했다.
+- `LoginScreen`을 provider config 기반 렌더링으로 바꿔 지원 가능한 로그인 방식을 한 화면에서 보여주도록 정리했다.
+- `en`, `ko`, `vi` 로케일에 `kakaoLogin`, `lineLogin`, `zaloLogin`, `facebookLogin` 키를 추가해 번역 구조를 다시 맞췄다.
+
+## 배운 점
+
+인증 화면은 단순히 버튼을 나열하는 곳이 아니라, 앱이 실제로 지원하는 인증 정책을 사용자에게 그대로 보여주는 곳이다.  
+백엔드/SDK/프론트 UI가 서로 다른 provider 집합을 가리키면, 사용자는 기능이 없는 것처럼 느끼거나 반대로 눌러보고 실패하는 경험을 하게 된다.
+
+또한 다국어 앱에서는 새 문구를 추가할 때 번역 내용만 보는 것이 아니라, **모든 로케일의 키 구조가 같은지** 먼저 확인하는 것이 중요했다.

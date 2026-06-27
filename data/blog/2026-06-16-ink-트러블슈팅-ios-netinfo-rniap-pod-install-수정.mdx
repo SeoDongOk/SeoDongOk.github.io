@@ -1,0 +1,54 @@
+---
+title: 'iOS RNCNetInfo null 오류와 RNIap Podspec 의존성 문제 해결'
+date: 2026-06-16
+tags: [INK, iOS, React Native, CocoaPods, NetInfo, RNIap, Troubleshooting]
+project: INK
+---
+
+## 문제 상황
+
+iOS 시뮬레이터에서 INK 앱 빌드와 설치는 성공했지만 실행 직후 React Native RedBox가 표시되었다.
+
+```text
+@react-native-community/netinfo: NativeModule.RNCNetInfo is null
+```
+
+안내에 따라 CocoaPods 재설치를 시도했지만, `pod install` 중 `RNIap`이 `RCT-Folly` Podspec을 찾지 못해 실패했다.
+
+```text
+[!] Unable to find a specification for `RCT-Folly` depended upon by `RNIap`
+```
+
+## 원인 분석
+
+`@react-native-community/netinfo`는 `package.json`에는 있었지만 기존 `ios/Podfile.lock`에는 `react-native-netinfo`가 포함되어 있지 않아 네이티브 모듈이 앱 바이너리에 링크되지 않았다.
+
+Pod 설치 실패는 `react-native-iap@12.16.4`의 `RNIap.podspec`이 New Architecture 환경에서 직접 `RCT-Folly`에 의존했기 때문이다. 현재 프로젝트의 React Native 0.84 구성은 기본적으로 prebuilt `ReactNativeDependencies`를 사용하므로, 라이브러리 Podspec이 RN의 `install_modules_dependencies(s)` 헬퍼에 의존성 결정을 맡겨야 한다.
+
+## 해결 방법
+
+프로젝트의 `scripts/patch-native-modules.js`에 `RNIap.podspec` 호환 패치를 추가했다. 기존의 직접 `RCT-Folly` 의존성 선언을 RN 헬퍼 호출로 바꾸어, RN 0.84의 prebuilt 의존성 구성을 따르게 했다.
+
+```ruby
+if ENV['RCT_NEW_ARCH_ENABLED'] == '1' then
+  install_modules_dependencies(s)
+end
+```
+
+이후 패치 스크립트와 Pod 설치, 앱 재빌드를 순서대로 실행했다.
+
+```bash
+node scripts/patch-native-modules.js
+cd ios
+HOME=/private/tmp/codex-pod-home COCOAPODS_HOME=/private/tmp/codex-pod-home/.cocoapods pod install
+cd ..
+HOME=/private/tmp/codex-sim-home RCT_NO_LAUNCH_PACKAGER=true npx react-native run-ios --udid <DEVICE_UDID> --no-packager
+```
+
+`pod install` 후 `react-native-netinfo`와 `RNIap`이 Pod에 포함되었고, 재빌드된 앱은 iOS 시뮬레이터에서 로그인 화면까지 정상 진입했다.
+
+## 배운 점
+
+- JS 패키지를 추가해도 iOS `Podfile.lock`과 Pods 프로젝트가 갱신되지 않으면 런타임에서 NativeModule이 `null`이 될 수 있다.
+- React Native 0.84의 prebuilt 의존성 환경에서는 오래된 Podspec의 직접 `RCT-Folly` 의존성이 CocoaPods 해석 실패를 만들 수 있다.
+- 임시로 node_modules를 수정해야 하는 경우 프로젝트의 postinstall 패치 스크립트에 반영해 재설치 후에도 같은 수정이 유지되도록 해야 한다.

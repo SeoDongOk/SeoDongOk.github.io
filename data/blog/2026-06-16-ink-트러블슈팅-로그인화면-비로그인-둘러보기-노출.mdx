@@ -1,0 +1,37 @@
+---
+title: '로그인 화면에서 비로그인 둘러보기 진입점이 보이지 않던 문제 해결'
+date: 2026-06-16
+tags: [INK, React Native, UX, Login, Troubleshooting]
+project: INK
+---
+
+## 문제 상황
+
+iOS 시뮬레이터에서 INK 앱 로그인 화면을 확인했을 때, 로그인 없이 앱을 둘러볼 수 있는 `먼저 둘러보기` 진입점이 첫 화면에 보이지 않았다. 사용자는 비로그인으로 들어갈 수 있는 메뉴가 사라진 것처럼 인식할 수 있었다.
+
+## 원인 분석
+
+`skipLogin` 기능 자체는 `LoginScreen`에 남아 있었지만, 버튼이 이메일 로그인 버튼과 약관 안내 아래의 `bottomGroup`에 배치되어 있었다. 로그인 화면에 소셜 로그인, 이메일 입력 폼, 비밀번호 찾기 등이 추가되면서 작은 화면이나 키보드/디버그 토스트가 있는 상황에서는 비로그인 진입점이 첫 화면 아래로 밀려났다.
+
+## 해결 방법
+
+비로그인 진입점을 로그인/회원가입 탭 바로 아래에 별도 버튼으로 배치했다. 기존의 하단 `먼저 둘러보기` 링크는 제거해 중복 노출을 피하고, 사용자가 로그인 폼을 스크롤하지 않아도 즉시 비로그인 둘러보기를 선택할 수 있게 했다.
+
+```tsx
+<Pressable
+  disabled={isSubmitting}
+  onPress={skipLogin}
+  style={[
+    styles.guestBrowseButton,
+    { backgroundColor: palette.elevated, borderColor: palette.primary },
+  ]}
+>
+  <Text style={[styles.guestBrowseLabel, { color: palette.primary }]}>{t('login.skipLogin')}</Text>
+</Pressable>
+```
+
+## 배운 점
+
+- 기능이 삭제되지 않았더라도 주요 진입점이 첫 화면에서 밀려나면 사용자는 기능이 사라졌다고 느낀다.
+- 로그인 화면은 인증 전환 버튼, 소셜 로그인, 이메일 폼보다 `비로그인 둘러보기` 같은 대체 진입 경로의 발견 가능성을 별도로 관리해야 한다.
+- 모바일 화면은 디버그 토스트, 키보드, Safe Area에 따라 실제 가시 영역이 달라지므로 CTA 우선순위를 레이아웃에 반영해야 한다.

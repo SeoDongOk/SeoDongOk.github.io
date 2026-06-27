@@ -1,0 +1,29 @@
+---
+title: 'INK CMS 허브를 만들며 Next.js typed route 오류를 정리'
+date: 2026-06-25
+tags: [INK, Next.js, CMS, admin, troubleshooting]
+project: INK
+---
+
+## 문제 상황
+
+INK 웹 관리자에 CMS 허브를 추가하는 과정에서 `Link`의 typed route 오류가 발생했다.  
+Next.js App Router의 타입 시스템이 경로 문자열을 엄격하게 검사하면서, 화면 전환 링크가 타입 에러로 막혔다.
+
+## 원인 분석
+
+문제는 코드 자체보다 Next.js의 typed route 규칙이었다.  
+`/admin/cms` 같은 경로를 일반 문자열로 넣으면, 프로젝트 설정에 따라 `RouteImpl` 타입과 충돌할 수 있다.
+
+CMS 허브 자체는 잘 구성되어 있었지만, 내부 링크가 타입 검사를 통과하지 못해 빌드 전 단계에서 막혔다.
+
+## 해결 방법
+
+- `next`의 `Route` 타입을 명시적으로 사용해 링크 경로를 캐스팅했다.
+- CMS 허브 페이지와 관리자 대시보드의 이동 링크를 typed route 규칙에 맞게 정리했다.
+- 이후 `typecheck`와 `lint`를 다시 돌려 경로 오류가 사라진 것을 확인했다.
+
+## 배운 점
+
+CMS처럼 페이지 이동이 많은 관리 화면은, 기능 설계만큼이나 프레임워크의 라우팅 타입 규칙을 맞추는 것이 중요하다.  
+특히 Next.js는 typed route가 활성화된 상태에서 사소한 링크도 타입 안정성의 대상이 되므로, 처음부터 라우트 타입을 의식하고 만드는 편이 유지보수에 좋다.

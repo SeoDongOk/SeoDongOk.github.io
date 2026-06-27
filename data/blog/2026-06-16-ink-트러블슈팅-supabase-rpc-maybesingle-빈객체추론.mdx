@@ -1,0 +1,40 @@
+---
+title: 'Supabase RPC maybeSingle 결과가 빈 객체로 추론되는 TypeScript 오류 해결'
+date: 2026-06-16
+tags: [INK, React Native, Supabase, TypeScript, Troubleshooting]
+project: INK
+---
+
+## 문제 상황
+
+`user_profiles` 민감 컬럼 과노출을 줄이기 위해 직접 select를 Supabase RPC 호출로 교체한 뒤 `npm run typecheck`에서 다음 오류가 발생했다.
+
+- `Property 'subscription_tier' does not exist on type '{}'`
+- `Property 'daily_likes_used' does not exist on type '{}'`
+
+문제 코드는 `supabaseClient.rpc(...).maybeSingle()` 결과를 바로 `data.subscription_tier`처럼 접근하는 형태였다.
+
+## 원인 분석
+
+현재 프로젝트의 Supabase 클라이언트는 generated Database 타입 없이 생성되어 있다. 이 상태에서 새로 만든 RPC의 반환 타입을 TypeScript가 알 수 없고, 특히 `.maybeSingle()` 체이닝 후 `data`가 `{}`로 좁혀졌다.
+
+런타임 응답 형태는 DB 함수 정의상 명확하지만, 정적 타입 시스템에는 `subscription_tier`, `daily_likes_used` 같은 필드 정보가 전달되지 않았다.
+
+## 해결 방법
+
+RPC별 반환 row 인터페이스를 클라이언트 코드에 명시하고, `.maybeSingle()` 결과를 해당 타입으로 좁혔다.
+
+- `SubscriptionStatusRow`
+  - `subscription_tier?: SubscriptionTier | null`
+  - `subscription_expires_at?: string | null`
+- `DailyLimitRow`
+  - `daily_likes_used?: number | null`
+  - `daily_superlikes_used?: number | null`
+
+그 후 nullable fallback을 유지해 데이터가 비어도 안전하게 기본값을 사용하도록 했다.
+
+검증 결과 `npm run typecheck`가 통과했다.
+
+## 배운 점
+
+Supabase RPC를 추가할 때 generated DB 타입을 쓰지 않는 프로젝트에서는 RPC 반환 타입을 클라이언트에 명시해야 한다. 특히 `maybeSingle()`은 런타임에는 편리하지만, 타입 정보가 없으면 `{}`로 추론될 수 있으므로 보안 hardening 중 타입 회귀 검증이 필수다.

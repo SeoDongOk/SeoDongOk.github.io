@@ -1,0 +1,33 @@
+---
+title: 'iOS simctl CoreSimulatorService 권한 오류를 HOME 우회로 해결'
+date: 2026-06-16
+tags: [INK, iOS, React Native, Simulator, CoreSimulator, Troubleshooting]
+project: INK
+---
+
+## 문제 상황
+
+INK React Native 앱을 iOS 시뮬레이터로 실행하기 위해 `xcrun simctl list devices`를 호출했을 때 CoreSimulatorService 연결이 끊기고, `/Users/seodong-og/Library/Logs/CoreSimulator/...` 경로에 로그 파일을 만들 수 없다는 `Operation not permitted` 오류가 발생했다.
+
+## 원인 분석
+
+Codex 실행 환경의 파일시스템 권한이 제한되어 있어 기본 사용자 홈의 `Library/Logs/CoreSimulator` 하위에 쓰기 권한이 없었다. `simctl`은 기기 목록 조회나 부팅 과정에서도 홈 디렉터리 아래 CoreSimulator 로그/상태 파일에 접근하므로, 시뮬레이터 자체 문제처럼 보여도 실제 원인은 샌드박스의 홈 디렉터리 쓰기 제한이었다.
+
+## 해결 방법
+
+Simulator 앱은 먼저 `open -a Simulator`로 실행한 뒤, `simctl` 명령에 임시 홈 디렉터리를 지정했다.
+
+```bash
+mkdir -p /private/tmp/codex-sim-home
+HOME=/private/tmp/codex-sim-home xcrun simctl list devices available
+HOME=/private/tmp/codex-sim-home xcrun simctl boot <DEVICE_UDID>
+HOME=/private/tmp/codex-sim-home xcrun simctl bootstatus <DEVICE_UDID> -b
+```
+
+이후 `iPhone 17 Pro` 시뮬레이터가 정상적으로 `Booted` 상태가 되었고, React Native 앱 빌드/설치 명령도 같은 `HOME` 값을 사용해 실행했다.
+
+## 배운 점
+
+- `simctl` 오류가 CoreSimulatorService 연결 문제로 보여도 샌드박스 환경에서는 홈 디렉터리 쓰기 권한을 먼저 의심해야 한다.
+- 제한된 실행 환경에서는 `HOME=/private/tmp/...`처럼 쓰기 가능한 임시 홈을 명시하면 CoreSimulator 로그/상태 파일 권한 문제를 우회할 수 있다.
+- 앱 실행 명령과 검증 명령에서 같은 임시 `HOME`을 일관되게 사용해야 동일한 시뮬레이터 상태를 볼 수 있다.

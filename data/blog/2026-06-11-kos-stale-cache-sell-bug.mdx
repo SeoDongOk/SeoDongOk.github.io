@@ -1,0 +1,82 @@
+---
+title: '매수 직후 매도가 씹히는 버그 — 30초 캐시가 범인이었다'
+date: 2026-06-11
+tags: [quantitative-trading, python, kos, algorithm, bug-fix]
+summary: '매수 체결 9초 뒤 손절 매도를 시도했는데 보유 없음으로 스킵됐다. 원인은 보유 종목 조회 API의 30초 캐시였다.'
+---
+
+## 문제 상황
+
+KOS 스캘핑 봇이 장 초반에 종목을 매수했는데, 직후 손절 조건이 충족돼도 매도가 실행되지 않았다.
+로그에는 이렇게 찍혔다.
+
+```
+09:05:42  ✅ [Round 2] 매수 체결 완료! 016920 44주 @ 1,000원
+09:05:51  🔴 매도 실행: 016920 (손절)
+09:05:51  ⚠️ [미매도 사유] 실제 보유 수량 0 → 포지션 정리
+```
+
+매수 체결 **9초 뒤**에 매도를 시도했는데 `보유 수량 0`으로 판단해서 그냥 포지션을 정리해버렸다.
+결과적으로 종목이 계좌에 물린 채 장이 끝났다.
+
+## 원인 분석
+
+`_execute_sell` 함수에서 매도 수량을 확인할 때 `get_holding_quantity(code)`를 호출한다.
+
+```python
+# order_executor.py
+if actual_qty is None:
+    actual_qty = await self.api_client.get_holding_quantity(code)  # 문제 라인
+```
+
+`get_holding_quantity`는 내부적으로 `get_account_holdings`를 호출하는데,
+여기에 **30초 TTL 캐시**가 걸려 있다.
+
+```python
+# api_client.py
+self._CACHE_TTL_SEC: float = 30.0
+
+async def get_account_holdings(self, force_refresh: bool = False):
+    now = time.monotonic()
+    if (
+        not force_refresh
+        and self._holdings_cache
+        and (now - self._holdings_cache_ts < self._CACHE_TTL_SEC)
+    ):
+        return self._holdings_cache  # 캐시 반환
+    # ... 실제 API 조회
+```
+
+타임라인을 보면 이렇다.
+
+| 시각     | 이벤트                                                        | 캐시 상태                                        |
+| -------- | ------------------------------------------------------------- | ------------------------------------------------ |
+| 09:05:40 | pending buy 점검 → 강제 실조회                                | **016920: 보유 없음** 으로 갱신                  |
+| 09:05:42 | 매수 체결                                                     | 캐시 갱신 없음                                   |
+| 09:05:51 | `_execute_sell` → `get_holding_quantity(force_refresh=False)` | TTL 11초 경과 → 캐시 히트 → **"보유 없음"** 반환 |
+
+매수가 체결됐어도 캐시가 갱신되지 않았고, 30초가 지나지 않아 캐시 히트가 발생했다.
+봇 입장에서는 "내가 산 게 없네" 하고 그냥 넘어간 것이다.
+
+## 해결 방법
+
+`_execute_sell`에서 보유 수량을 조회할 때는 **항상 실제 API를 찌르도록** `force_refresh=True`를 명시했다.
+
+```python
+# 수정 전
+actual_qty = await self.api_client.get_holding_quantity(code)
+
+# 수정 후
+actual_qty = await self.api_client.get_holding_quantity(code, force_refresh=True)
+```
+
+매도 실행은 체결 직후 수 초 내에 일어나는 경로다. 이 경로에서 캐시를 믿으면 안 된다.
+캐시는 주기적 모니터링처럼 빈번한 조회의 API 부하를 줄이기 위한 것이고,
+"지금 내가 이 종목을 얼마나 갖고 있나"를 판단해야 하는 거래 결정에는 실조회가 맞다.
+
+## 배운 점
+
+- 캐시 TTL은 "이 데이터가 이 시간 동안 유효하다"는 가정이다. **체결은 캐시 갱신 타이밍을 보장하지 않는다.**
+- 거래 결정 경로(매수/매도 수량 확인)와 모니터링 경로(현재 보유 현황 표시)는 캐시 전략이 달라야 한다.
+- `force_refresh=False`가 기본값인 함수를 거래 로직에서 그냥 호출하면 이런 버그가 생긴다.
+  기본값이 안전한 쪽이어야 하거나, 거래 경로에서는 명시적으로 `force_refresh=True`를 넘겨야 한다.

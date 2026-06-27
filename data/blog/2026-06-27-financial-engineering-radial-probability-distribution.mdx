@@ -1,0 +1,205 @@
+---
+title: '금융공학 노트 — 방사방향 확률분포 (다변량 정규분포의 반경 분해와 마할라노비스 거리)'
+date: '2026-06-27'
+tags:
+  ['financial-engineering', 'quant', 'probability', 'multivariate-normal', 'mahalanobis', 'risk']
+draft: false
+summary: '다변량 정규분포를 방향(구면)과 크기(반경)로 분해하면, 반경은 카이 분포가 되고 마할라노비스 거리는 카이제곱이 된다. 신뢰타원·VaR·차원의 저주·금융 위기지표(financial turbulence)까지 방사방향 확률분포가 금융공학에서 갖는 의미를 정리한 학습 노트.'
+category: misc
+---
+
+> 자산 수익률은 벡터다. 그 벡터의 **방향**은 자산들이 함께 움직이는 패턴이고, **크기(반경)**는 충격의 강도다. 방사방향 확률분포는 이 "크기"가 어떻게 분포하는지를 다룬다 — 위기 감지와 리스크 측정의 수학적 토대.
+
+## 1. 왜 금융공학에서 "반경"인가
+
+n개 자산의 수익률 편차를 벡터 `x = (x₁, ..., xₙ)`로 보면, 두 가지 정보로 쪼갤 수 있다.
+
+- **방향(angular)**: 어느 자산이 어느 자산과 같이 움직였나 → 상관구조
+- **크기(radial)**: 이번 움직임이 평소 대비 얼마나 컸나 → 충격의 세기
+
+"오늘 시장이 얼마나 비정상적인가?"는 본질적으로 **반경(크기) 질문**이다. 그래서 방사방향 확률분포를 알아야 한다.
+
+## 2. 1차원에서 다차원으로
+
+단변량 표준정규 `Z ~ N(0,1)`의 밀도는 원점에서 최대다. 그런데 자산이 n개면 `Z = (Z₁,...,Zₙ) ~ N(0, Iₙ)`이고, 우리가 궁금한 건 **벡터의 길이** `R = ‖Z‖ = √(Z₁² + ... + Zₙ²)`의 분포다.
+
+```text
+R² = Z₁² + Z₂² + ... + Zₙ²  ~  χ²(n)   (카이제곱, 자유도 n)
+R  = ‖Z‖                     ~  χ(n)    (카이 분포)
+```
+
+이게 "방사방향 확률분포"의 기본형이다. **수익률 벡터의 길이는 카이 분포를 따른다.**
+
+## 3. 핵심 통찰: 밀도 ≠ 반경 확률 (껍질 효과)
+
+여기가 가장 중요한 부분이다. 밀도 `f(z) ∝ e^(−‖z‖²/2)`는 **원점에서 최대**다. 그런데도 길이가 0인 점 근처에서 벡터를 거의 못 만난다. 왜?
+
+n차원에서 반지름 r, 두께 dr인 **껍질의 부피가 `r^(n−1)`에 비례**하기 때문이다.
+
+```text
+반경 R의 밀도:
+f_R(r) ∝ r^(n−1) · e^(−r²/2)     (r > 0)
+         └─────┘   └────────┘
+         껍질부피    점밀도
+```
+
+- `r → 0`: 점밀도는 최대지만 껍질부피가 0 → **반경 확률 0**
+- `r → ∞`: 껍질부피는 크지만 점밀도가 급감 → 0
+- 둘의 경쟁으로 **중간 어딘가에 봉우리**가 생긴다. 최빈 반경은 `r = √(n−1)`.
+
+> 💡 이건 물리에서 수소 원자의 "방사 확률분포"(밀도는 핵에서 최대지만 전자를 가장 자주 발견하는 거리는 보어 반지름)와 **완전히 같은 수학**이다. r² 가중(3차원)이 금융에선 `r^(n−1)` 가중(n차원)으로 일반화될 뿐이다.
+
+## 4. 마할라노비스 거리 = 타원 세계의 반경
+
+실제 자산은 분산도 다르고 상관도 있다 → 공분산 `Σ`. 이때 "반경"은 유클리드 길이가 아니라 **공분산으로 표준화한 거리**, 즉 마할라노비스 거리다.
+
+```text
+D² = (x − μ)ᵀ Σ⁻¹ (x − μ)
+```
+
+다변량 정규분포라면:
+
+```text
+D² ~ χ²(n)
+```
+
+`Σ⁻¹`이 좌표를 "찌그러진 타원"에서 "동그란 구"로 펴주기 때문에, 마할라노비스 거리는 §2의 카이 세계로 되돌아온다. **마할라노비스 거리가 곧 금융 데이터에서의 방사방향 좌표**다.
+
+## 5. 구면–방사 분해 (타원분포)
+
+다변량 정규를 포함한 **타원분포(elliptical distribution)**는 다음처럼 분해된다.
+
+```text
+X = μ + R · A · U
+
+U : 단위구면 위 균등분포  (방향 — 상관구조 담당)
+A : Σ = A Aᵀ 의 촐레스키 인수  (타원 모양으로 변형)
+R : 음이 아닌 확률변수  (반경 — 방사방향 확률분포)
+```
+
+- 정규분포 → `R² ~ χ²(n)`
+- **Student-t 분포 → R이 더 두꺼운 꼬리** → 극단적 공동 충격(동시 폭락)을 더 잘 설명 → **fat tail / 꼬리위험**
+
+즉 정규냐 t냐의 차이는 **방향(U)이 아니라 반경(R)의 분포 차이**다. 금융의 꼬리위험은 본질적으로 "반경 분포 문제"인 셈이다.
+
+## 6. 신뢰타원과 VaR
+
+`D² ~ χ²(n)`이므로, 임계값 하나로 다자산 신뢰영역을 그릴 수 있다.
+
+```text
+P( D² ≤ χ²_{n, α} ) = α
+
+→ { x : (x−μ)ᵀ Σ⁻¹ (x−μ) ≤ χ²_{n, α} } 는
+   확률 α를 담는 n차원 신뢰타원(ellipsoid)
+```
+
+- 2자산이면 익숙한 **신뢰타원**, n자산이면 신뢰초타원체.
+- 이 경계가 다변량 VaR·리스크 한도의 기하학적 형태다. 타원의 **축 방향 = Σ의 고유벡터(주성분)**, **축 길이 = √(고유값)** 에 비례.
+
+## 7. 고차원의 직관: 가우시안은 얇은 껍질에 산다
+
+§3의 봉우리 `√(n−1)`를 자산 수 n이 클 때로 밀면 충격적인 결과가 나온다 (**가우시안 환(annulus) 정리**).
+
+```text
+n차원 표준정규의 질량은 거의 전부
+반경 ≈ √n 인 얇은 껍질에 집중된다.
+(평균 반경 ≈ √n,  반경의 표준편차 ≈ 상수 O(1))
+```
+
+- **원점(평균) 근처는 사실상 비어 있다.** "평균적인 시나리오"는 밀도는 최고지만 실제로는 거의 일어나지 않는다.
+- 자산 수가 많아질수록 "전형적인 충격의 크기"는 `√n`으로 커지고, 그 폭은 상대적으로 얇아진다.
+- 차원의 저주의 한 단면이며, 고차원 몬테카를로·머신러닝 기반 리스크 모델을 해석할 때 반드시 기억해야 할 직관이다.
+
+## 8. 금융 응용 정리
+
+| 응용                         | 방사방향 확률분포가 하는 역할                                                                                           |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **위기 감지**                | 마할라노비스 거리를 **financial turbulence index**로 사용(Kritzman & Li 2010). D²가 χ²의 꼬리에 들어가면 "비정상 국면". |
+| **다자산 VaR / 리스크 한도** | 신뢰타원 `(x−μ)ᵀΣ⁻¹(x−μ) ≤ χ²_{n,α}` 경계.                                                                              |
+| **꼬리위험 모델링**          | 정규→t 등 **반경 R의 분포 교체**로 공동 극단 사건 반영(타원분포·copula).                                                |
+| **이상치 탐지**              | 큰 마할라노비스 거리 = 다변량 이상치(개별 자산은 정상인데 조합이 비정상인 경우 포착).                                   |
+| **몬테카를로**               | 방향 U(구면 균등)와 반경 R을 분리 생성 → 분산 축소·시나리오 설계.                                                       |
+
+## 체크리스트
+
+- [ ] 수익률 벡터의 길이 `‖Z‖`가 카이 분포, 그 제곱이 카이제곱임을 안다.
+- [ ] 밀도(원점 최대)와 반경 확률(중간 봉우리)이 다른 이유 = `r^(n−1)` 껍질 효과를 설명할 수 있다.
+- [ ] 마할라노비스 거리 `(x−μ)ᵀΣ⁻¹(x−μ) ~ χ²(n)` 을 쓸 수 있다.
+- [ ] 타원분포의 구면–방사 분해 `X = μ + R·A·U`에서 R이 꼬리위험을 좌우함을 안다.
+- [ ] 신뢰타원이 χ² 임계값으로 정의됨을 안다.
+- [ ] 고차원 가우시안 질량이 반경 √n 껍질에 집중됨을 안다.
+
+## 연습 문제
+
+<InteractiveHTML>
+  {`<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: 'Segoe UI', sans-serif; max-width: 640px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; }
+  h2 { font-size: 1.1rem; color: #7dd3fc; margin-bottom: 16px; }
+  .q { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #334155; }
+  .q-text { font-size: 1rem; margin-bottom: 14px; line-height: 1.6; }
+  .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  button { background: #1e40af; color: white; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button.correct { background: #15803d !important; }
+  button.wrong { background: #991b1b !important; }
+  button:disabled { cursor: not-allowed; opacity: 0.85; }
+  .hint { margin-top: 10px; font-size: 0.85rem; color: #94a3b8; min-height: 1.2em; }
+  .score { text-align: center; font-size: 1.2rem; color: #7dd3fc; margin-top: 20px; }
+  .reset { display: block; margin: 16px auto 0; background: #4f46e5; padding: 10px 24px; border-radius: 8px; }
+</style>
+</head>
+<body>
+<h2>방사방향 확률분포 연습</h2>
+<div id="quiz"></div>
+<div class="score" id="score" style="display:none"></div>
+<script>
+const qs = [
+  { q: "n차원 표준정규 Z의 길이 제곱 ‖Z‖²의 분포는?", opts: ["χ²(n) 카이제곱","N(0,1)","t분포","균등분포"], ans: 0, hint: "제곱합 = 카이제곱(자유도 n). 길이 자체는 카이 χ(n)." },
+  { q: "밀도는 원점에서 최대인데 길이 0 근처에서 벡터를 거의 못 보는 이유는?", opts: ["밀도가 0이라서","껍질 부피가 r^(n−1)→0","상관이 0이라서","평균이 0이라서"], ans: 1, hint: "점밀도×껍질부피(r^(n−1)). r→0에서 부피가 0." },
+  { q: "다변량 정규에서 마할라노비스 거리 제곱 (x−μ)ᵀΣ⁻¹(x−μ)의 분포는?", opts: ["N(0,1)","F분포","χ²(n)","지수분포"], ans: 2, hint: "Σ⁻¹이 타원을 구로 펴줘 χ²(n)으로." },
+  { q: "n차원 가우시안의 확률질량이 집중되는 곳은?", opts: ["원점(평균) 근처","반경 √n 얇은 껍질","반경 1 구면","무한대"], ans: 1, hint: "가우시안 환 정리: 평균 근처는 비어 있고 √n 껍질에 집중." },
+  { q: "타원분포 X = μ + R·A·U 에서 꼬리위험(정규 vs t)을 좌우하는 성분은?", opts: ["방향 U","반경 R","평균 μ","촐레스키 A"], ans: 1, hint: "정규→t 차이는 방향이 아니라 반경 R의 분포." },
+  { q: "마할라노비스 거리를 시장 위기 지표로 쓴 금융 응용의 이름은?", opts: ["Financial turbulence index","샤프 지수","베타","듀레이션"], ans: 0, hint: "Kritzman & Li(2010)의 financial turbulence." },
+];
+let done = 0, correct = 0;
+function render() {
+  const el = document.getElementById('quiz');
+  el.innerHTML = qs.map((q, i) => '<div class="q" id="q'+i+'"><div class="q-text">'+(i+1)+'. '+q.q+'</div><div class="opts">'+q.opts.map((o,j) => '<button onclick="ans('+i+','+j+')" id="b'+i+j+'">'+o+'</button>').join('')+'</div><div class="hint" id="h'+i+'"></div></div>').join('');
+}
+function ans(qi, bi) {
+  const q = qs[qi];
+  for(let j=0;j<4;j++) {
+    const btn = document.getElementById('b'+qi+j);
+    btn.disabled = true;
+    if(j===q.ans) btn.classList.add('correct');
+    else if(j===bi && bi!==q.ans) btn.classList.add('wrong');
+  }
+  document.getElementById('h'+qi).textContent = q.hint;
+  if(bi===q.ans) correct++;
+  done++;
+  if(done===qs.length) showScore();
+}
+function showScore() {
+  const sc = document.getElementById('score');
+  sc.style.display = 'block';
+  const msg = correct===qs.length?'완벽!':correct>=5?'잘했어!':'다시 보자';
+  sc.innerHTML = '결과: '+correct+'/'+qs.length+' '+msg+'<br><button class="reset" onclick="reset()">다시 풀기</button>';
+}
+function reset() { done=0; correct=0; document.getElementById('score').style.display='none'; render(); }
+render();
+</script>
+</body>
+</html>`}
+</InteractiveHTML>
+
+## 팩트체크 / 참고
+
+이 글은 표준적인 다변량 통계·금융 리스크 이론을 학습 노트로 재정리한 것이다.
+
+- Kritzman, M. & Li, Y. (2010). _Skulls, Financial Turbulence, and Risk Management._ Financial Analysts Journal — 마할라노비스 거리 기반 financial turbulence index.
+- McNeil, Frey & Embrechts. _Quantitative Risk Management_ — 타원분포와 구면–방사 분해.
+- Blum, Hopcroft & Kannan. _Foundations of Data Science_ — 가우시안 환(annulus) 정리, 고차원 집중.

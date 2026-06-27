@@ -1,0 +1,142 @@
+---
+title: 'JLPT N4 약점 공략 드릴 — 헷갈리는 유사표현 + 한자 읽기 (실전 18문제)'
+date: '2026-06-28'
+tags: ['japanese', 'grammar', 'kanji', 'japanese-study', 'jlpt-n4']
+draft: false
+summary: 'N4에서 가장 많이 틀리는 유사표현 구분(ので/のに, ために/ように, 추량 4종, て형 보조동사, 조건 4종)을 압축 정리하고, 문장 속 한자 읽기까지 한 번에 공략하는 실전 18문제 드릴. 모든 한자에 후리가나를 달았다.'
+category: japan
+---
+
+N4 문법을 틀리는 숨은 원인은 두 가지다. **① 비슷한 표현의 의미 차이를 못 잡는 것**, 그리고 **② 문장 속 한자(漢字)를 못 읽어서 뜻 자체를 놓치는 것**. 이 글은 그 둘을 한 번에 잡는 약점 공략 드릴이다. 먼저 헷갈림 포인트를 압축한 뒤, 한자 읽기를 정리하고, 실전 18문제로 마무리한다.
+
+---
+
+## 1. 유사표현 "한 줄 구분" 압축표
+
+| 헷갈리는 짝                    | 구분 키                                              | 예                                                      |
+| ------------------------------ | ---------------------------------------------------- | ------------------------------------------------------- |
+| **ので / のに**                | 당연한 결과=**ので** / 의외·불만=**のに**            | 雨なので中止 / 雨なのに行く                             |
+| **ために / ように**            | 의지동사=**ために** / 가능·무의지=**ように**         | 合格するために / 合格できるように                       |
+| **らしい / ようだ**            | 정황·소문 근거=**らしい** / 직접 관찰=**ようだ**     | 来ないらしい / 来ないようだ                             |
+| **そうだ(전문) / つもり**      | 들은 것 전달=**そうだ** / 의도(추측 아님)=**つもり** | 来るそうだ / 来るつもり                                 |
+| **てしまう / ておく / てある** | 완료·후회 / 준비 / (타동사)의도된 상태               | 食べてしまった / 買っておく / 書いてある                |
+| **と / ば / たら / なら**      | 자연결과 / 일반조건 / 순서·완료 / 화제전제           | 押すと開く / 安ければ買う / 着いたら電話 / 行くなら京都 |
+
+> ⚠️ **`のに` 주의**: "~인데도(의외·불만)"일 때만! 뒤가 당연한 결과면 `ので`, 목적이면 `ために`다. (가장 많이 과용하는 함정)
+
+---
+
+## 2. 문장에 자주 나오는 N4 한자 읽기
+
+문법 문제 지문에 단골로 등장하는 한자들이다. 읽기가 막히면 문제 자체가 안 풀린다.
+
+| 한자 | 읽기       | 뜻        |
+| ---- | ---------- | --------- |
+| 経験 | けいけん   | 경험      |
+| 予約 | よやく     | 예약      |
+| 留学 | りゅうがく | 유학      |
+| 練習 | れんしゅう | 연습      |
+| 故障 | こしょう   | 고장      |
+| 残業 | ざんぎょう | 야근      |
+| 会議 | かいぎ     | 회의      |
+| 資料 | しりょう   | 자료      |
+| 都合 | つごう     | 사정·형편 |
+| 用意 | ようい     | 준비      |
+| 約束 | やくそく   | 약속      |
+| 説明 | せつめい   | 설명      |
+
+> 💡 **읽기 팁**: 음독 한자어는 **장음(ー)·촉음(っ)·탁음(゛)**에서 자주 틀린다. 経験=けい**けん**(장음 X 주의), 残業=ざん**ぎょう**(탁음+장음), 約束=やく**そく**(촉음 아님).
+
+---
+
+## 3. 실전 드릴 18문제
+
+유사표현 구분 12문제 + 한자 읽기 6문제. 풀고 바로 해설을 확인하자.
+
+<InteractiveHTML>
+  {`<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: 'Segoe UI', sans-serif; max-width: 640px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; }
+  h2 { font-size: 1.05rem; color: #7dd3fc; margin: 18px 0 12px; }
+  .sec { color: #fbbf24; font-size: 0.8rem; font-weight: bold; margin: 4px 0 10px; }
+  .q { background: #1e293b; border-radius: 12px; padding: 18px; margin-bottom: 14px; border: 1px solid #334155; }
+  .q-text { font-size: 1rem; margin-bottom: 12px; line-height: 1.6; }
+  .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  button { background: #1e40af; color: white; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+  button:hover:not(:disabled) { background: #2563eb; }
+  button.correct { background: #15803d !important; }
+  button.wrong { background: #991b1b !important; }
+  button:disabled { cursor: not-allowed; opacity: 0.85; }
+  .hint { margin-top: 10px; font-size: 0.85rem; color: #94a3b8; min-height: 1.2em; }
+  .score { text-align: center; font-size: 1.2rem; color: #7dd3fc; margin-top: 20px; }
+  .reset { display: block; margin: 16px auto 0; background: #4f46e5; padding: 10px 24px; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div id="quiz"></div>
+<div class="score" id="score" style="display:none"></div>
+<script>
+const qs = [
+  { sec:"■ 유사표현 (이유·역접·목적)", q: "1. 電車（でんしゃ）が遅（おく）れた（　）、会議に間（ま）に合（あ）わなかった。", opts: ["ので","のに","ために","ように"], ans: 0, hint: "지각→못 맞춤 = 당연한 결과 → ので" },
+  { sec:"", q: "2. たくさん勉強（べんきょう）した（　）、点数（てんすう）が悪（わる）かった。", opts: ["ので","のに","ために","ばかり"], ans: 1, hint: "공부했는데도 점수 나쁨 = 의외·불만 → のに" },
+  { sec:"", q: "3. 健康（けんこう）の（　）、毎朝（まいあさ）走（はし）っている。", opts: ["のに","ように","ために","そうに"], ans: 2, hint: "건강을 위해(목적), 명사+の+ために" },
+  { sec:"", q: "4. 日本語（にほんご）が話（はな）せる（　）、毎日（まいにち）練習（れんしゅう）する。", opts: ["ために","ように","ので","のに"], ans: 1, hint: "話せる(가능형)=무의지 → ように" },
+  { sec:"■ 유사표현 (추량·의도)", q: "5. 空（そら）が暗（くら）い。今（いま）にも雨（あめ）が降（ふ）り（　）だ。", opts: ["そう","つもり","らしい","ところ"], ans: 0, hint: "ます형(降り)+そう = 곧 일어날 듯(양태そう). 사전형+そう면 전문(~한대)이 됨" },
+  { sec:"", q: "6. ニュースによると、台風（たいふう）が来（く）る（　）。", opts: ["ようだ","そうだ","つもりだ","ところだ"], ans: 1, hint: "뉴스에 의하면(전달) = 보통형+そうだ(전문)" },
+  { sec:"", q: "7. 来年（らいねん）、留学（りゅうがく）する（　）です。", opts: ["らしい","そう","つもり","ところ"], ans: 2, hint: "내 의지·작정 = つもり" },
+  { sec:"", q: "8. 電気（でんき）がついている。だれかいる（　）。", opts: ["つもりだ","ようだ","ことだ","ものだ"], ans: 1, hint: "불 켜진 정황을 직접 보고 추측 = ようだ" },
+  { sec:"■ 유사표현 (て형 보조동사)", q: "9. 客（きゃく）が来（く）る前（まえ）に、部屋（へや）を掃除（そうじ）し（　）。", opts: ["てしまう","ておく","てある","てくる"], ans: 1, hint: "오기 전 미리 준비 = ておく" },
+  { sec:"", q: "10. 壁（かべ）にカレンダーが掛（か）け（　）。", opts: ["ている","てある","ておく","てみる"], ans: 1, hint: "타동사 掛ける+의도된 상태 = てある" },
+  { sec:"■ 유사표현 (조건)", q: "11. このボタンを押（お）す（　）、お湯（ゆ）が出（で）る。", opts: ["ば","と","なら","のに"], ans: 1, hint: "누르면 반드시 나옴(자연결과·기계) = と" },
+  { sec:"", q: "12. 京都（きょうと）に行（い）く（　）、新幹線（しんかんせん）が便利（べんり）だよ。", opts: ["と","たら","なら","ば"], ans: 2, hint: "상대 말을 전제로 조언 = なら" },
+  { sec:"■ 한자 읽기", q: "13. 「経験」の読み方は？", opts: ["けいけん","けいげん","きょうけん","きょけん"], ans: 0, hint: "経験 = けいけん (탁음 아님)" },
+  { sec:"", q: "14. 「都合」の読み方は？", opts: ["とごう","つごう","とあい","つあい"], ans: 1, hint: "都合 = つごう (사정·형편)" },
+  { sec:"", q: "15. 「残業」の読み方は？", opts: ["ざんごう","さんぎょう","ざんぎょう","ざんぎょ"], ans: 2, hint: "残業 = ざんぎょう (탁음+장음)" },
+  { sec:"", q: "16. 「用意」の読み方は？", opts: ["ようい","よい","よういん","ようえ"], ans: 0, hint: "用意 = ようい (준비)" },
+  { sec:"", q: "17. 「故障」の読み方は？", opts: ["こしょう","こうしょう","ごしょう","こしょ"], ans: 0, hint: "故障 = こしょう (고장)" },
+  { sec:"", q: "18. やくそく를 한자로 쓰면？", opts: ["約束","約則","約東","紋束"], ans: 0, hint: "約束 = やくそく (約+束)" },
+];
+let done = 0, correct = 0;
+function render() {
+  const el = document.getElementById('quiz');
+  el.innerHTML = qs.map((q, i) => (q.sec?'<div class="sec">'+q.sec+'</div>':'')+'<div class="q" id="q'+i+'"><div class="q-text">'+q.q+'</div><div class="opts">'+q.opts.map((o,j) => '<button onclick="ans('+i+','+j+')" id="b'+i+j+'">'+o+'</button>').join('')+'</div><div class="hint" id="h'+i+'"></div></div>').join('');
+}
+function ans(qi, bi) {
+  const q = qs[qi];
+  for(let j=0;j<q.opts.length;j++) {
+    const btn = document.getElementById('b'+qi+j);
+    btn.disabled = true;
+    if(j===q.ans) btn.classList.add('correct');
+    else if(j===bi && bi!==q.ans) btn.classList.add('wrong');
+  }
+  document.getElementById('h'+qi).textContent = q.hint;
+  if(bi===q.ans) correct++;
+  done++;
+  if(done===qs.length) showScore();
+}
+function showScore() {
+  const sc = document.getElementById('score');
+  sc.style.display = 'block';
+  const pct = Math.round(correct/qs.length*100);
+  const msg = correct>=16?'N4 합격권!':correct>=12?'잘하고 있어!':correct>=8?'조금 더!':'다시 복습하자';
+  sc.innerHTML = '결과: '+correct+'/'+qs.length+' ('+pct+'%) '+msg+'<br><button class="reset" onclick="reset()">다시 풀기</button>';
+}
+function reset() { done=0; correct=0; document.getElementById('score').style.display='none'; render(); }
+render();
+</script>
+</body>
+</html>`}
+</InteractiveHTML>
+
+---
+
+## 4. 틀리기 쉬운 포인트 최종 정리
+
+- **のに 과용 금지**: 뒤가 "당연한 결과"면 ので, "목적"이면 ために. のに는 오직 "의외·불만".
+- **추량 4종**: 정황·소문=らしい / 직접 관찰=ようだ / 전달=そうだ(보통형+) / 곧 일어날 듯=そうだ(ます형+, 양태). つもり는 추측이 아니라 **의도**.
+- **て형 보조동사**: 미리=ておく / 의도된 상태(타동사)=てある / 완료·후회=てしまう.
+- **조건**: 기계·자연결과=と / 일반=ば / 순서=たら / 화제전제·조언=なら.
+- **한자 읽기**: 음독은 장음·촉음·탁음에서 갈린다. 눈으로만 읽지 말고 소리 내어 외우면 청해에도 도움.

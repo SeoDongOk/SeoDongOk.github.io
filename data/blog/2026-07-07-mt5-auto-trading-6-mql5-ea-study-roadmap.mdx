@@ -1,0 +1,384 @@
+---
+title: 'MT5 자동매매 입문 6 — MQL5로 EA 만들기 공부 로드맵'
+date: '2026-07-07'
+tags: ['mt5', 'metatrader5', 'mql5', 'expert-advisor', 'automated-trading', 'ea']
+draft: false
+summary: 'MT5 자동매매를 MQL5 EA 방식으로 공부하기 위한 순서를 정리한다. OnInit, OnTick, CTrade, 포지션 중복 방지, 손절·익절, Strategy Tester까지 초보자 기준으로 다룬다.'
+category: quant
+---
+
+> 이 글은 학습용 정리이며 투자 권유가 아니다. 자동매매는 손실 위험이 크므로 반드시 데모 계정과 백테스트를 먼저 거쳐야 한다.
+
+MT5 자동매매를 제대로 공부하려면 결국 한 번은 **MQL5로 EA를 직접 만들어보는 과정**이 필요하다.  
+Python으로 MT5를 제어하는 방법도 있지만, MT5 안에서 가장 정석적으로 돌아가는 자동매매 방식은 **MQL5 Expert Advisor(EA)**다.
+
+이번 글은 “MQL5가 뭔지도 모르는데 EA 자동매매를 공부해야겠다”는 상황을 기준으로, 어떤 순서로 공부하면 되는지 정리한 로드맵이다.
+
+## MQL5와 EA의 관계
+
+MQL5는 MetaTrader 5에서 사용하는 전용 프로그래밍 언어다.  
+EA는 Expert Advisor의 약자로, MT5 안에서 실행되는 자동매매 프로그램을 뜻한다.
+
+정리하면 아래와 같다.
+
+| 개념            | 의미                                        |
+| --------------- | ------------------------------------------- |
+| MT5             | 거래 터미널, 차트, 주문, 백테스트 실행 환경 |
+| MQL5            | MT5용 자동매매·지표 개발 언어               |
+| EA              | MQL5로 만든 자동매매 봇                     |
+| MetaEditor      | MQL5 코드를 작성하고 컴파일하는 에디터      |
+| Strategy Tester | EA를 과거 데이터로 테스트하는 도구          |
+
+즉, 흐름은 이렇게 된다.
+
+```text
+MQL5 코드 작성
+→ EA 컴파일
+→ MT5 차트에 EA 붙이기
+→ 데모 계정에서 실행
+→ Strategy Tester로 백테스트
+→ VPS에서 24시간 운영
+```
+
+## 왜 MQL5 EA부터 공부해야 할까?
+
+MT5 자동매매에는 크게 두 길이 있다.
+
+1. MQL5로 EA 만들기
+2. Python으로 MT5에 연결해서 자동매매 만들기
+
+둘 다 가능하지만, 처음 자동매매 구조를 배우기에는 MQL5 EA 방식이 좋다.
+
+이유는 다음과 같다.
+
+- MT5 Strategy Tester와 바로 연결된다.
+- EA 실행, 로그, 차트 부착, 입력값 관리가 MT5에 통합되어 있다.
+- 자동매매 운영 방식이 MT5 표준 구조에 가깝다.
+- VPS 마이그레이션도 EA 기준으로 이해하기 쉽다.
+- 주문, 포지션, 손절, 익절의 기본 개념을 직접 익히게 된다.
+
+Python은 데이터 분석에는 좋지만, 백테스트와 운영 안정성을 직접 더 많이 챙겨야 한다. 그래서 처음에는 MQL5 EA로 기본기를 잡고, 나중에 Python을 보조 도구로 붙이는 순서가 좋다.
+
+## 1단계: MT5 기본 조작부터 익히기
+
+코딩 전에 MT5 자체를 먼저 알아야 한다.
+
+먼저 데모 계정에서 아래 작업을 해본다.
+
+- 종목 차트 열기
+- 시간봉 변경하기
+- 수동 매수/매도하기
+- 손절과 익절 설정하기
+- 포지션 청산하기
+- 주문 내역과 로그 보기
+- Strategy Tester 위치 확인하기
+
+이 단계의 목표는 간단하다.
+
+```text
+내가 수동으로 할 수 없는 주문은 자동매매로도 안전하게 만들기 어렵다.
+```
+
+자동매매는 수동 주문을 코드로 반복하는 것이기 때문에, 먼저 수동 주문 흐름을 이해해야 한다.
+
+## 2단계: EA의 기본 구조 이해하기
+
+MQL5 EA는 보통 세 가지 함수에서 시작한다.
+
+```mql5
+int OnInit()
+{
+   // EA가 시작될 때 한 번 실행
+   return(INIT_SUCCEEDED);
+}
+
+void OnTick()
+{
+   // 가격 틱이 새로 들어올 때마다 실행
+}
+
+void OnDeinit(const int reason)
+{
+   // EA가 종료될 때 실행
+}
+```
+
+가장 중요한 함수는 `OnTick()`이다.  
+새 가격이 들어올 때마다 실행되기 때문에, 매수 조건, 매도 조건, 청산 조건 대부분이 이 안에서 처리된다.
+
+하지만 여기서 초보자가 가장 많이 하는 실수가 있다.
+
+```mql5
+void OnTick()
+{
+   trade.Buy(0.1);
+}
+```
+
+이렇게 작성하면 틱이 들어올 때마다 계속 매수 주문을 보낼 수 있다.  
+그래서 반드시 포지션 중복 방지 조건이 필요하다.
+
+## 3단계: 현재 가격 가져오기
+
+자동매매는 가격을 읽는 것부터 시작한다.
+
+```mql5
+double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+```
+
+| 값       | 의미                            |
+| -------- | ------------------------------- |
+| BID      | 내가 매도할 수 있는 가격        |
+| ASK      | 내가 매수할 수 있는 가격        |
+| \_Symbol | 현재 EA가 붙어 있는 차트의 종목 |
+| \_Point  | 해당 종목의 최소 가격 단위      |
+| \_Period | 현재 차트의 시간봉              |
+
+매수 주문은 보통 ASK 기준으로 체결되고, 매도 주문은 BID 기준으로 체결된다.  
+이 차이를 이해해야 스프레드와 손절·익절 계산도 이해할 수 있다.
+
+## 4단계: CTrade로 주문 넣기
+
+MQL5에서는 주문을 다룰 때 표준 라이브러리의 `CTrade` 클래스를 많이 사용한다.
+
+기본 형태는 아래와 같다.
+
+```mql5
+#include <Trade/Trade.mqh>
+
+CTrade trade;
+
+void OnTick()
+{
+   if(PositionsTotal() == 0)
+   {
+      trade.Buy(0.1);
+   }
+}
+```
+
+여기서 `PositionsTotal()`은 현재 열린 포지션 개수를 확인한다.  
+포지션이 없을 때만 매수하도록 막아둔 것이다.
+
+하지만 이 코드는 아직 부족하다.
+
+- 손절이 없다.
+- 익절이 없다.
+- 특정 종목의 포지션만 확인하지 않는다.
+- 스프레드 필터가 없다.
+- 주문 실패 로그가 없다.
+
+그래도 첫 학습용으로는 “포지션이 없으면 한 번만 주문한다”는 개념을 익히기 좋다.
+
+## 5단계: 손절과 익절 추가하기
+
+다음은 손절과 익절을 붙인다.
+
+```mql5
+#include <Trade/Trade.mqh>
+
+CTrade trade;
+
+input double LotSize = 0.1;
+input int StopLossPoints = 500;
+input int TakeProfitPoints = 1000;
+
+void OnTick()
+{
+   if(PositionsTotal() == 0)
+   {
+      double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+
+      double sl = ask - StopLossPoints * _Point;
+      double tp = ask + TakeProfitPoints * _Point;
+
+      trade.Buy(LotSize, _Symbol, ask, sl, tp);
+   }
+}
+```
+
+여기서 중요한 것은 `input`이다.
+
+`input`으로 선언한 값은 EA를 차트에 붙일 때 설정창에서 바꿀 수 있다.  
+즉, 코드를 매번 고치지 않고 lot, 손절, 익절 값을 조정할 수 있다.
+
+## 6단계: 포지션 중복 방지 개선하기
+
+`PositionsTotal() == 0`은 전체 계좌의 포지션 개수만 본다.  
+여러 종목을 거래하거나 다른 EA를 같이 쓸 때는 부족할 수 있다.
+
+실전에서는 보통 아래 조건을 더 본다.
+
+- 현재 종목의 포지션인지
+- 이 EA가 만든 포지션인지
+- Magic Number가 일치하는지
+
+Magic Number는 EA별 주문 식별자라고 생각하면 된다.
+
+```mql5
+input ulong MagicNumber = 20260707;
+```
+
+EA마다 다른 Magic Number를 주면, 여러 EA를 동시에 돌릴 때 주문을 구분하기 쉬워진다.
+
+## 7단계: 지표 사용하기
+
+전략을 만들려면 보통 이동평균, RSI, ATR 같은 지표를 사용한다.
+
+예를 들어 이동평균 핸들은 이렇게 만든다.
+
+```mql5
+int maHandle;
+
+int OnInit()
+{
+   maHandle = iMA(_Symbol, _Period, 20, 0, MODE_SMA, PRICE_CLOSE);
+
+   if(maHandle == INVALID_HANDLE)
+   {
+      Print("MA handle creation failed");
+      return(INIT_FAILED);
+   }
+
+   return(INIT_SUCCEEDED);
+}
+```
+
+그리고 `CopyBuffer()`로 지표 값을 가져온다.
+
+```mql5
+double maBuffer[];
+ArraySetAsSeries(maBuffer, true);
+
+if(CopyBuffer(maHandle, 0, 0, 3, maBuffer) <= 0)
+{
+   Print("CopyBuffer failed");
+   return;
+}
+
+double currentMA = maBuffer[0];
+```
+
+이 단계부터 진짜 전략 개발이 시작된다.
+
+## 8단계: 첫 전략은 단순하게 만들기
+
+처음부터 복잡한 전략을 만들 필요는 없다.  
+첫 전략은 이동평균 크로스 정도면 충분하다.
+
+예시 규칙:
+
+```text
+단기 이동평균이 장기 이동평균을 위로 돌파하면 매수
+단기 이동평균이 장기 이동평균을 아래로 돌파하면 매도
+포지션은 하나만 유지
+항상 손절과 익절을 설정
+```
+
+중요한 것은 수익성이 아니라 구조를 이해하는 것이다.
+
+처음 EA에서 확인할 것:
+
+- 조건이 맞을 때만 주문이 나가는가?
+- 한 틱에 주문이 반복되지 않는가?
+- 손절과 익절이 붙는가?
+- 로그가 남는가?
+- Strategy Tester에서 실행되는가?
+
+## 9단계: Strategy Tester로 백테스트하기
+
+EA를 만들었다면 바로 실계좌에 넣으면 안 된다.  
+먼저 Strategy Tester에서 과거 데이터로 돌려본다.
+
+확인할 항목:
+
+| 항목      | 확인 이유                                       |
+| --------- | ----------------------------------------------- |
+| 주문 횟수 | 전략이 너무 자주 또는 너무 적게 거래하지 않는지 |
+| 최대 낙폭 | 손실 구간을 감당할 수 있는지                    |
+| 연속 손실 | 멘탈과 계좌가 버틸 수 있는지                    |
+| 손익비    | 평균 이익과 평균 손실의 관계                    |
+| 그래프    | 수익 곡선이 비정상적으로 튀지 않는지            |
+| 로그      | 주문 실패나 오류가 없는지                       |
+
+백테스트 수익률만 보고 판단하면 안 된다.  
+초보자는 특히 최대 낙폭과 연속 손실을 더 중요하게 봐야 한다.
+
+## 10단계: 데모 계정에서 실시간 테스트하기
+
+백테스트가 통과되면 데모 계정에서 실시간으로 돌린다.
+
+최소 확인할 것:
+
+- 실제 틱에서 주문이 정상 작동하는지
+- 스프레드가 넓을 때 진입하지 않는지
+- 손절/익절이 브로커 조건에 맞게 들어가는지
+- MT5 재시작 후에도 문제가 없는지
+- 로그가 충분히 남는지
+- 예상하지 못한 중복 주문이 없는지
+
+실계좌는 이 다음이다.  
+처음부터 실계좌로 테스트하면 학습비가 너무 비싸질 수 있다.
+
+## MQL5 EA 공부 체크리스트
+
+아래 항목을 하나씩 체크하면서 공부하면 된다.
+
+- [ ] MT5 데모 계정 연결
+- [ ] 수동 주문, 손절, 익절, 청산 연습
+- [ ] MetaEditor에서 새 EA 만들기
+- [ ] `OnInit()`, `OnTick()`, `OnDeinit()` 이해
+- [ ] `SymbolInfoDouble()`로 BID/ASK 가져오기
+- [ ] `CTrade`로 매수/매도 주문 넣기
+- [ ] 포지션 중복 방지하기
+- [ ] 손절/익절 붙이기
+- [ ] Magic Number 이해하기
+- [ ] 이동평균 지표 핸들 만들기
+- [ ] `CopyBuffer()`로 지표 값 가져오기
+- [ ] Strategy Tester로 백테스트하기
+- [ ] 데모 계정에서 실시간 테스트하기
+- [ ] VPS 운영 개념 이해하기
+
+## 처음 만들 EA 목표
+
+첫 EA 목표는 수익 전략이 아니라 아래 정도면 충분하다.
+
+```text
+포지션이 없을 때만 1회 매수한다.
+손절과 익절을 건다.
+입력값으로 lot, 손절, 익절을 조정할 수 있다.
+주문 성공/실패 로그를 남긴다.
+Strategy Tester에서 실행된다.
+```
+
+이걸 만들 수 있으면 MQL5 EA의 기본 뼈대는 이해한 것이다.
+
+## 정리
+
+MQL5 EA 공부는 한 번에 다 하려고 하면 어렵다.  
+하지만 순서를 나누면 생각보다 명확하다.
+
+```text
+MT5 조작
+→ EA 기본 구조
+→ 가격 조회
+→ 주문 실행
+→ 손절/익절
+→ 중복 방지
+→ 지표 사용
+→ 백테스트
+→ 데모 운영
+→ VPS 운영
+```
+
+자동매매의 핵심은 “매수 조건 하나”가 아니라, 주문이 안전하게 나가고 실패했을 때 멈출 수 있는 구조를 만드는 것이다.  
+MQL5 EA를 공부할 때도 수익보다 먼저 **안전한 실행 구조**를 목표로 잡는 것이 좋다.
+
+## 참고 자료
+
+- MQL5 OnInit: https://www.mql5.com/en/docs/event_handlers/oninit
+- MQL5 OnTick: https://www.mql5.com/en/docs/event_handlers/ontick
+- MQL5 OnDeinit: https://www.mql5.com/en/docs/event_handlers/ondeinit
+- MQL5 CTrade Class: https://www.mql5.com/en/docs/standardlibrary/tradeclasses/ctrade
+- MetaTrader 5 Strategy Testing: https://www.metatrader5.com/en/terminal/help/algotrading/testing

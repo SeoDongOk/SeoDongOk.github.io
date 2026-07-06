@@ -1,0 +1,227 @@
+---
+title: 'MT5 자동매매 입문 4 — Python으로 MT5 연결하고 첫 조회 코드 만들기'
+date: '2026-07-07'
+tags: ['mt5', 'metatrader5', 'python', 'automated-trading', 'algo-trading']
+draft: false
+summary: 'Python MetaTrader5 패키지로 MT5 터미널에 연결하고 계좌 정보, 종목 정보, 틱 데이터, 캔들 데이터를 조회하는 기본 코드를 정리한다.'
+category: quant
+---
+
+> 이 글은 학습용 정리이며 투자 권유가 아니다. 아래 코드는 처음에는 반드시 데모 계정에서 조회용으로만 실행하자.
+
+MT5 자동매매를 Python으로 시작하면 pandas, numpy 같은 데이터 분석 도구를 함께 쓰기 좋다. 다만 Python이 브로커 서버에 직접 붙는 구조가 아니라, **실행 중인 MT5 터미널과 연결**하는 방식이라는 점을 먼저 이해해야 한다.
+
+## 1. 준비물
+
+Python 연동에 필요한 것은 아래와 같다.
+
+- 설치된 MT5 터미널
+- 로그인된 데모 계정
+- Python 환경
+- `MetaTrader5` 패키지
+- 조회할 종목명
+
+패키지 설치:
+
+```bash
+pip install MetaTrader5
+pip install pandas
+```
+
+공식 문서 기준으로 `MetaTrader5` 패키지는 MT5 터미널에서 데이터를 가져오고 거래 요청을 보내는 기능을 제공한다.
+
+## 2. MT5 터미널 실행 상태 확인
+
+Python 코드 실행 전에 MT5 터미널을 먼저 켜둔다. 그리고 데모 계정에 로그인되어 있는지 확인한다.
+
+체크리스트:
+
+```text
+MT5 실행됨
+데모 계정 로그인됨
+Market Watch에 종목 표시됨
+인터넷 연결 정상
+AutoTrading은 처음엔 꺼둠
+```
+
+조회만 할 때는 AutoTrading이 꼭 켜져 있을 필요는 없다. 하지만 주문까지 보낼 때는 설정이 중요해진다.
+
+## 3. 첫 연결 코드
+
+가장 먼저 연결이 되는지 확인한다.
+
+```python
+import MetaTrader5 as mt5
+
+if not mt5.initialize():
+    print('MT5 initialize failed:', mt5.last_error())
+    raise SystemExit
+
+print('MT5 version:', mt5.version())
+print('Terminal info:', mt5.terminal_info())
+
+mt5.shutdown()
+```
+
+이 코드가 실패한다면 아래를 확인한다.
+
+- MT5 터미널이 실행 중인가?
+- Python과 MT5의 비트 수가 맞는가?
+- 터미널 경로를 명시해야 하는 환경인가?
+- 계정 로그인이 되어 있는가?
+
+## 4. 계좌 정보 조회
+
+연결이 되면 계좌 정보를 조회한다.
+
+```python
+import MetaTrader5 as mt5
+
+if not mt5.initialize():
+    print('initialize failed:', mt5.last_error())
+    raise SystemExit
+
+account = mt5.account_info()
+if account is None:
+    print('account_info failed:', mt5.last_error())
+else:
+    print('login:', account.login)
+    print('balance:', account.balance)
+    print('equity:', account.equity)
+    print('margin:', account.margin)
+    print('currency:', account.currency)
+
+mt5.shutdown()
+```
+
+자동매매에서는 잔고(balance)보다 평가자산(equity)을 더 자주 확인해야 한다. 오픈 포지션 손익이 반영되기 때문이다.
+
+## 5. 종목 정보와 현재 호가 조회
+
+브로커마다 종목명이 다를 수 있으므로 먼저 종목 정보를 확인한다.
+
+```python
+import MetaTrader5 as mt5
+
+SYMBOL = 'EURUSD'
+
+if not mt5.initialize():
+    print('initialize failed:', mt5.last_error())
+    raise SystemExit
+
+selected = mt5.symbol_select(SYMBOL, True)
+if not selected:
+    print('symbol_select failed:', SYMBOL, mt5.last_error())
+    mt5.shutdown()
+    raise SystemExit
+
+info = mt5.symbol_info(SYMBOL)
+tick = mt5.symbol_info_tick(SYMBOL)
+
+print('symbol:', info.name)
+print('digits:', info.digits)
+print('volume_min:', info.volume_min)
+print('volume_step:', info.volume_step)
+print('bid:', tick.bid)
+print('ask:', tick.ask)
+print('spread:', tick.ask - tick.bid)
+
+mt5.shutdown()
+```
+
+여기서 `volume_min`, `volume_step`은 주문 수량 계산에 중요하다.
+
+## 6. 캔들 데이터 가져오기
+
+전략을 만들려면 과거 캔들 데이터가 필요하다.
+
+```python
+from datetime import datetime
+import pandas as pd
+import MetaTrader5 as mt5
+
+SYMBOL = 'EURUSD'
+TIMEFRAME = mt5.TIMEFRAME_M5
+COUNT = 200
+
+if not mt5.initialize():
+    print('initialize failed:', mt5.last_error())
+    raise SystemExit
+
+rates = mt5.copy_rates_from_pos(SYMBOL, TIMEFRAME, 0, COUNT)
+if rates is None:
+    print('copy_rates_from_pos failed:', mt5.last_error())
+    mt5.shutdown()
+    raise SystemExit
+
+df = pd.DataFrame(rates)
+df['time'] = pd.to_datetime(df['time'], unit='s')
+print(df.tail())
+
+mt5.shutdown()
+```
+
+이제 `df`에 시가, 고가, 저가, 종가, 거래량 정보가 들어온다. 여기서 이동평균, RSI, ATR 등을 계산할 수 있다.
+
+## 7. 아주 단순한 신호 만들기
+
+주문은 아직 보내지 말고 신호만 출력해보자.
+
+```python
+import pandas as pd
+import MetaTrader5 as mt5
+
+SYMBOL = 'EURUSD'
+
+if not mt5.initialize():
+    print('initialize failed:', mt5.last_error())
+    raise SystemExit
+
+rates = mt5.copy_rates_from_pos(SYMBOL, mt5.TIMEFRAME_M5, 0, 200)
+df = pd.DataFrame(rates)
+df['time'] = pd.to_datetime(df['time'], unit='s')
+
+df['ma_fast'] = df['close'].rolling(10).mean()
+df['ma_slow'] = df['close'].rolling(30).mean()
+
+last = df.iloc[-1]
+prev = df.iloc[-2]
+
+if prev.ma_fast <= prev.ma_slow and last.ma_fast > last.ma_slow:
+    print('BUY signal')
+elif prev.ma_fast >= prev.ma_slow and last.ma_fast < last.ma_slow:
+    print('SELL signal')
+else:
+    print('NO signal')
+
+mt5.shutdown()
+```
+
+이 단계에서는 절대 주문을 넣지 않는다. 먼저 데이터가 정상인지, 신호가 의도대로 나오는지 확인한다.
+
+## 8. 주문 코드는 왜 나중에 붙여야 하나
+
+초보자는 연결되자마자 `order_send()`를 쓰고 싶어 한다. 하지만 아래를 먼저 준비해야 한다.
+
+- 종목명 확인
+- 최소 lot 확인
+- 스프레드 필터
+- 손절/익절 계산
+- 중복 포지션 방지
+- 하루 손실 한도
+- 주문 실패 처리
+- 로그 저장
+
+이 장치 없이 주문부터 붙이면 자동매매가 아니라 자동 사고에 가까워진다.
+
+## 정리
+
+Python으로 MT5를 다룰 때 첫 목표는 주문이 아니라 **안정적인 조회**다. 연결, 계좌 정보, 종목 정보, 틱 데이터, 캔들 데이터를 정확히 가져올 수 있어야 그 다음 주문 로직을 안전하게 만들 수 있다.
+
+다음 글에서는 MT5 Strategy Tester, 백테스트, 포워드 테스트, 운영 체크리스트를 정리한다.
+
+## 참고 자료
+
+- MQL5 Python Integration: https://www.mql5.com/en/docs/python_metatrader5
+- MetaTrader5 Python initialize: https://www.mql5.com/en/docs/python_metatrader5/mt5initialize_py
+- MetaTrader5 Python order_send: https://www.mql5.com/en/docs/python_metatrader5/mt5ordersend_py

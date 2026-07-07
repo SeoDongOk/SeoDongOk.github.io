@@ -1,0 +1,436 @@
+---
+title: '정보처리기사 실기 약점 보완 4 — 고난이도 Java 출력 문제 패턴'
+date: '2026-07-08'
+tags: ['정보처리기사', 'java', 'oop', 'inheritance', 'programming', 'study']
+draft: false
+summary: '정보처리기사 실기 Java 출력 문제에서 자주 나오는 상속, 오버라이딩, static, String 비교, 예외 처리, 형변환 패턴을 정리했다.'
+category: misc
+---
+
+정보처리기사 실기에서 Java 문제는 C보다 문법 자체는 익숙해 보여도, 실제로는 **객체지향 동작 원리**를 모르면 틀리기 쉽다.  
+특히 상속, 오버라이딩, static, String 비교, try-finally가 섞이면 실수가 많이 난다.
+
+이번 글은 Java 고난이도 출력 문제를 패턴별로 정리한다.
+
+## 1. Java 출력 문제 풀이 순서
+
+Java 문제는 아래 순서로 본다.
+
+```text
+1. 클래스 상속 관계를 먼저 확인한다.
+2. 참조변수 타입과 실제 객체 타입을 구분한다.
+3. 오버라이딩된 메서드인지 확인한다.
+4. static 변수/메서드인지 확인한다.
+5. 생성자 호출 순서를 확인한다.
+6. 예외 처리와 finally 실행 여부를 확인한다.
+```
+
+핵심은 이 문장이다.
+
+```text
+멤버 변수는 참조변수 타입 기준, 오버라이딩 메서드는 실제 객체 기준.
+```
+
+## 2. 오버라이딩 기본 패턴
+
+```java
+class A {
+    void print() { System.out.print("A"); }
+}
+class B extends A {
+    void print() { System.out.print("B"); }
+}
+public class Main {
+    public static void main(String[] args) {
+        A obj = new B();
+        obj.print();
+    }
+}
+```
+
+정답:
+
+```text
+B
+```
+
+풀이:
+
+```text
+참조 타입은 A
+실제 객체는 B
+print()는 B에서 오버라이딩됨
+오버라이딩 메서드는 실제 객체 기준으로 호출
+```
+
+## 3. 멤버 변수 숨김 패턴
+
+```java
+class A {
+    int x = 1;
+}
+class B extends A {
+    int x = 2;
+}
+public class Main {
+    public static void main(String[] args) {
+        A obj = new B();
+        System.out.print(obj.x);
+    }
+}
+```
+
+정답:
+
+```text
+1
+```
+
+풀이:
+
+```text
+필드는 오버라이딩되지 않고 숨김 처리된다.
+필드 접근은 참조변수 타입 A 기준.
+따라서 obj.x는 A의 x = 1.
+```
+
+메서드는 실제 객체, 필드는 참조 타입을 기준으로 본다.
+
+## 4. 생성자 호출 순서
+
+```java
+class A {
+    A() { System.out.print("A"); }
+}
+class B extends A {
+    B() { System.out.print("B"); }
+}
+public class Main {
+    public static void main(String[] args) {
+        new B();
+    }
+}
+```
+
+정답:
+
+```text
+AB
+```
+
+풀이:
+
+```text
+자식 객체 생성 시 부모 생성자가 먼저 호출된다.
+A 생성자 → B 생성자 순서.
+```
+
+## 5. static 변수 공유 패턴
+
+```java
+class Counter {
+    static int count = 0;
+    Counter() { count++; }
+}
+public class Main {
+    public static void main(String[] args) {
+        new Counter();
+        new Counter();
+        System.out.print(Counter.count);
+    }
+}
+```
+
+정답:
+
+```text
+2
+```
+
+풀이:
+
+```text
+static 변수는 객체별이 아니라 클래스 단위로 공유된다.
+생성자가 두 번 호출되어 count는 2.
+```
+
+## 6. static 메서드 숨김 패턴
+
+```java
+class A {
+    static void print() { System.out.print("A"); }
+}
+class B extends A {
+    static void print() { System.out.print("B"); }
+}
+public class Main {
+    public static void main(String[] args) {
+        A obj = new B();
+        obj.print();
+    }
+}
+```
+
+정답:
+
+```text
+A
+```
+
+풀이:
+
+```text
+static 메서드는 오버라이딩이 아니라 숨김이다.
+호출은 참조변수 타입 A 기준.
+```
+
+주의:
+
+```text
+일반 메서드 = 실제 객체 기준
+static 메서드 = 참조 타입 기준
+```
+
+## 7. String 비교 패턴
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        String a = new String("hi");
+        String b = "hi";
+        System.out.print((a == b) + " " + a.equals(b));
+    }
+}
+```
+
+정답:
+
+```text
+false true
+```
+
+풀이:
+
+```text
+==는 참조 주소 비교
+equals()는 문자열 내용 비교
+new String("hi")는 새 객체 생성
+따라서 a == b는 false, a.equals(b)는 true
+```
+
+## 8. StringBuilder 패턴
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        StringBuilder sb = new StringBuilder("AB");
+        sb.append("C");
+        sb.reverse();
+        System.out.print(sb);
+    }
+}
+```
+
+정답:
+
+```text
+CBA
+```
+
+풀이:
+
+```text
+AB → append C → ABC
+reverse → CBA
+```
+
+String은 불변이지만 StringBuilder는 내부 값이 바뀐다.
+
+## 9. try-catch-finally 패턴
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        try {
+            System.out.print("A");
+            int x = 3 / 0;
+            System.out.print("B");
+        } catch(Exception e) {
+            System.out.print("C");
+        } finally {
+            System.out.print("D");
+        }
+    }
+}
+```
+
+정답:
+
+```text
+ACD
+```
+
+풀이:
+
+```text
+A 출력
+3/0에서 예외 발생
+B는 실행되지 않음
+catch에서 C 출력
+finally에서 D 출력
+```
+
+finally는 거의 항상 실행된다.
+
+## 10. return과 finally 패턴
+
+```java
+public class Main {
+    static int f() {
+        try {
+            return 1;
+        } finally {
+            System.out.print("F");
+        }
+    }
+    public static void main(String[] args) {
+        System.out.print(f());
+    }
+}
+```
+
+정답:
+
+```text
+F1
+```
+
+풀이:
+
+```text
+try에서 return 값 1이 준비됨
+메서드 종료 전 finally 실행 → F 출력
+이후 return 값 1 출력
+```
+
+## 11. 형변환 패턴
+
+```java
+class A { }
+class B extends A { }
+public class Main {
+    public static void main(String[] args) {
+        A a = new B();
+        B b = (B)a;
+        System.out.print("OK");
+    }
+}
+```
+
+정답:
+
+```text
+OK
+```
+
+풀이:
+
+```text
+실제 객체가 B이므로 B로 다운캐스팅 가능하다.
+```
+
+반대로 아래는 런타임 오류가 난다.
+
+```java
+A a = new A();
+B b = (B)a;
+```
+
+실제 객체가 A이므로 B로 캐스팅할 수 없다.
+
+## 12. 오버로딩 패턴
+
+```java
+public class Main {
+    static void f(int x) { System.out.print("int"); }
+    static void f(double x) { System.out.print("double"); }
+    public static void main(String[] args) {
+        f(3);
+    }
+}
+```
+
+정답:
+
+```text
+int
+```
+
+풀이:
+
+```text
+오버로딩은 컴파일 시점에 매개변수 타입으로 결정된다.
+3은 int 리터럴이므로 f(int)가 호출된다.
+```
+
+## 13. 배열 참조 복사 패턴
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        int[] a = {1, 2, 3};
+        int[] b = a;
+        b[0] = 10;
+        System.out.print(a[0] + a[1]);
+    }
+}
+```
+
+정답:
+
+```text
+12
+```
+
+풀이:
+
+```text
+b = a는 같은 배열 객체를 가리킨다.
+b[0] = 10이면 a[0]도 10.
+a[0] + a[1] = 10 + 2 = 12
+```
+
+## 14. Java 문제 핵심 비교표
+
+| 개념                   | 기준                      |
+| ---------------------- | ------------------------- |
+| 오버라이딩 일반 메서드 | 실제 객체 타입            |
+| 멤버 변수              | 참조변수 타입             |
+| static 메서드          | 참조변수 타입             |
+| 오버로딩               | 컴파일 시점 매개변수 타입 |
+| `==`                   | 참조 비교                 |
+| `equals()`             | 내용 비교                 |
+| 생성자                 | 부모 → 자식 순서          |
+| finally                | return 전에도 실행        |
+
+## 15. 시험 직전 체크리스트
+
+```text
+참조 타입과 실제 객체 타입을 구분했는가?
+메서드가 오버라이딩인지 static인지 확인했는가?
+필드 접근인지 메서드 호출인지 구분했는가?
+String 비교가 ==인지 equals인지 확인했는가?
+finally가 실행되는지 확인했는가?
+배열/객체가 참조 복사인지 확인했는가?
+```
+
+## 마무리
+
+Java 출력 문제는 문법 암기보다 객체 동작 원리를 묻는다.  
+특히 아래 한 줄은 반드시 외워야 한다.
+
+```text
+오버라이딩 메서드는 실제 객체 기준, 필드와 static 메서드는 참조 타입 기준.
+```
+
+이 원칙만 잡아도 상속 관련 문제에서 흔들리는 경우가 크게 줄어든다.

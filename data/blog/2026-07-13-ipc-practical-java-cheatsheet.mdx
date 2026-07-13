@@ -1,0 +1,211 @@
+---
+title: '정보처리기사 실기 치트시트 2 — Java 출력 문제'
+date: '2026-07-13'
+tags: ['정보처리기사', 'java', 'oop', 'inheritance', 'exception', 'study']
+draft: false
+summary: 'Java 코드 실행 결과 문제에 필요한 상속, 오버라이딩, 필드 숨김, static, 문자열, 예외 처리와 제네릭 핵심 규칙을 정리했다.'
+category: misc
+---
+
+Java 출력 문제는 문법보다 **참조 타입과 실제 객체 타입을 분리해서 추적하는 능력**을 묻는다. 다음 순서로 보면 복잡한 문제도 안정적으로 풀 수 있다.
+
+```text
+상속 관계 → 생성자 → 참조 타입/실제 타입 → static 여부 → 예외 흐름 → 출력
+```
+
+## 1. 필드와 메서드의 기준
+
+```text
+필드와 static 메서드: 참조 타입 기준
+오버라이딩 인스턴스 메서드: 실제 객체 기준
+```
+
+```java
+class Parent {
+    int value = 1;
+    void print() { System.out.print("P"); }
+}
+
+class Child extends Parent {
+    int value = 2;
+    @Override
+    void print() { System.out.print("C"); }
+}
+
+Parent object = new Child();
+System.out.print(object.value);
+object.print();
+```
+
+결과는 `1C`다. 필드는 `Parent`, 오버라이딩 메서드는 실제 객체인 `Child`를 따른다.
+
+## 2. 오버로딩과 오버라이딩
+
+| 구분        | 오버로딩                   | 오버라이딩  |
+| ----------- | -------------------------- | ----------- |
+| 위치        | 같은 클래스 중심           | 상속 관계   |
+| 메서드 이름 | 동일                       | 동일        |
+| 매개변수    | 개수 또는 타입이 달라야 함 | 동일해야 함 |
+| 결정 시점   | 컴파일 시점                | 실행 시점   |
+
+```java
+void print(int value) { }
+void print(String value) { }  // 오버로딩
+```
+
+반환 타입만 다른 것은 오버로딩이 아니다.
+
+## 3. 생성자 호출 순서
+
+```java
+class Parent {
+    Parent() { System.out.print("P"); }
+}
+
+class Child extends Parent {
+    Child() { System.out.print("C"); }
+}
+
+new Child(); // PC
+```
+
+```text
+부모 static 초기화 → 자식 static 초기화
+→ 부모 인스턴스 초기화/생성자
+→ 자식 인스턴스 초기화/생성자
+```
+
+첫 문장에 `this(...)` 또는 `super(...)`가 없으면 컴파일러가 `super()`를 삽입한다.
+
+## 4. static 공유
+
+```java
+class Counter {
+    static int shared = 0;
+    int own = 0;
+
+    Counter() {
+        shared++;
+        own++;
+    }
+}
+
+Counter a = new Counter();
+Counter b = new Counter();
+System.out.print(Counter.shared + " " + a.own + " " + b.own);
+```
+
+결과는 `2 1 1`이다. static 변수는 클래스에 하나, 인스턴스 변수는 객체마다 하나다.
+
+## 5. String 비교와 불변성
+
+```java
+String a = "hello";
+String b = "hello";
+String c = new String("hello");
+
+System.out.print(a == b);       // true일 수 있음: 문자열 풀
+System.out.print(a == c);       // false: 참조 비교
+System.out.print(a.equals(c));  // true: 내용 비교
+```
+
+시험에서는 다음처럼 기억한다.
+
+```text
+== : 기본형 값 또는 객체 참조 비교
+equals(): 문자열 내용 비교
+String: 불변 객체
+StringBuilder: 가변, 단일 스레드에 적합
+StringBuffer: 가변, 동기화 제공
+```
+
+## 6. 형변환
+
+```java
+Parent p = new Child();       // 업캐스팅, 자동
+Child c = (Child) p;          // 다운캐스팅, 명시적
+```
+
+실제 객체가 Child가 아닌데 Child로 강제 형변환하면 `ClassCastException`이 발생한다. `instanceof`는 형변환 가능 여부를 확인할 때 사용한다.
+
+## 7. 추상 클래스와 인터페이스
+
+| 구분      | 추상 클래스           | 인터페이스                |
+| --------- | --------------------- | ------------------------- |
+| 상속/구현 | `extends`             | `implements`              |
+| 다중 적용 | 클래스 단일 상속      | 여러 인터페이스 구현 가능 |
+| 목적      | 공통 상태와 동작 공유 | 구현 계약 정의            |
+
+인터페이스의 필드는 기본적으로 `public static final`, 추상 메서드는 기본적으로 `public abstract`다. Java 8 이후 `default`, `static` 메서드를 정의할 수 있다.
+
+## 8. 예외 처리
+
+```java
+try {
+    System.out.print("A");
+    int value = 10 / 0;
+    System.out.print("B");
+} catch (ArithmeticException e) {
+    System.out.print("C");
+} finally {
+    System.out.print("D");
+}
+```
+
+결과는 `ACD`다. 예외가 발생한 뒤의 `B`는 실행되지 않고, catch 뒤 finally가 실행된다.
+
+```text
+throw: 예외 객체를 직접 발생
+throws: 메서드가 예외를 호출자에게 전달한다고 선언
+checked exception: 컴파일 시 처리 강제
+unchecked exception: RuntimeException 계열
+```
+
+`return`이 있어도 일반적으로 finally가 실행된다. 다만 finally가 값을 바꾸더라도 return 값이 이미 계산된 경우와 참조 객체가 변경된 경우를 구분한다.
+
+## 9. 컬렉션과 제네릭
+
+| 타입 | 특징                     |
+| ---- | ------------------------ |
+| List | 순서와 중복 허용         |
+| Set  | 중복 불허                |
+| Map  | 키-값 저장, 키 중복 불허 |
+
+```java
+List<Integer> numbers = new ArrayList<>();
+numbers.add(10);       // 오토박싱: int → Integer
+int value = numbers.get(0); // 언박싱: Integer → int
+```
+
+제네릭은 컴파일 시 타입 안정성을 제공하며 구현에는 타입 소거가 적용된다. 기본형은 타입 인자로 사용할 수 없어 `int` 대신 `Integer`를 사용한다.
+
+## 10. 재귀와 반복문 추적
+
+```java
+static int function(int n) {
+    if (n <= 1) return 1;
+    return n * function(n - 1);
+}
+```
+
+`function(4)`는 `4 × 3 × 2 × 1 = 24`다. 재귀 문제는 호출과 반환을 구분해 적는다.
+
+```text
+호출: f(4) → f(3) → f(2) → f(1)
+반환: 1 → 2 → 6 → 24
+```
+
+## 11. 시험 직전 점검
+
+```text
+필드=참조 타입, 오버라이딩 메서드=실제 객체
+부모 생성자가 자식 생성자보다 먼저
+static은 객체가 아닌 클래스에 공유
+문자열 내용 비교는 equals
+break는 반복문/정상 switch 종료, continue는 다음 반복
+finally는 예외 여부와 관계없이 일반적으로 실행
+List는 순서·중복 허용, Set은 중복 불허, Map은 키-값
+재귀는 호출 단계와 반환 단계를 따로 기록
+```
+
+코드를 읽을 때 각 객체 옆에 인스턴스 필드를 적고, static 변수는 클래스 위에 한 번만 적는다. 출력이 발생할 때마다 바로 답안 칸에 이어 쓰면 순서 실수를 줄일 수 있다.

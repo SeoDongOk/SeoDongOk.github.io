@@ -1,0 +1,280 @@
+---
+title: '정보처리기사 실기 치트시트 1 — SQL·데이터베이스 만점 전략'
+date: '2026-07-13'
+tags: ['정보처리기사', 'sql', 'database', 'normalization', 'transaction', 'study']
+draft: false
+summary: 'SQL 실행 순서와 JOIN, GROUP BY, NULL, 서브쿼리부터 키, 무결성, 정규화, 트랜잭션까지 시험 직전에 확인할 내용을 한 장으로 정리했다.'
+category: misc
+---
+
+정보처리기사 실기에서 SQL과 데이터베이스는 규칙이 명확해 안정적으로 점수를 확보하기 좋은 영역이다. 백엔드 개발 경험이 있더라도 시험에서는 ORM이 대신 처리하던 `NULL`, 집계, 조인 결과를 직접 계산해야 한다. 목표는 **알고 있는 문제를 실수 없이 모두 맞히는 것**이다.
+
+## 1. SQL 논리적 실행 순서
+
+```text
+작성: SELECT → FROM → WHERE → GROUP BY → HAVING → ORDER BY
+실행: FROM → WHERE → GROUP BY → HAVING → SELECT → DISTINCT → ORDER BY
+```
+
+- `WHERE`: 그룹화 전 개별 행 필터링
+- `HAVING`: 그룹화 후 그룹 필터링
+- SELECT 별칭은 일반적으로 WHERE에서 사용할 수 없고 ORDER BY에서는 사용할 수 있다.
+
+```sql
+SELECT department_id, COUNT(*) AS employee_count
+FROM employee
+WHERE salary >= 3000
+GROUP BY department_id
+HAVING COUNT(*) >= 2
+ORDER BY employee_count DESC;
+```
+
+## 2. SQL 명령어 분류
+
+| 분류 | 목적          | 명령어                                 |
+| ---- | ------------- | -------------------------------------- |
+| DDL  | 구조 정의     | `CREATE`, `ALTER`, `DROP`, `TRUNCATE`  |
+| DML  | 데이터 조작   | `SELECT`, `INSERT`, `UPDATE`, `DELETE` |
+| DCL  | 권한 제어     | `GRANT`, `REVOKE`                      |
+| TCL  | 트랜잭션 제어 | `COMMIT`, `ROLLBACK`, `SAVEPOINT`      |
+
+```sql
+CREATE TABLE employee (
+    employee_id INTEGER PRIMARY KEY,
+    name VARCHAR(30) NOT NULL,
+    department_id INTEGER,
+    salary INTEGER DEFAULT 0 CHECK (salary >= 0),
+    email VARCHAR(100) UNIQUE,
+    FOREIGN KEY (department_id) REFERENCES department(department_id)
+);
+
+INSERT INTO employee (employee_id, name, salary)
+VALUES (1, '홍길동', 4000);
+
+UPDATE employee SET salary = salary * 1.1 WHERE department_id = 10;
+DELETE FROM employee WHERE employee_id = 1;
+```
+
+| 명령어     | 삭제 범위            | WHERE  | 테이블 구조 |
+| ---------- | -------------------- | ------ | ----------- |
+| `DELETE`   | 선택 행 또는 전체 행 | 가능   | 유지        |
+| `TRUNCATE` | 전체 행              | 불가능 | 유지        |
+| `DROP`     | 테이블 자체          | 불가능 | 삭제        |
+
+## 3. NULL 함정
+
+`NULL`은 0이나 빈 문자열이 아니라 **알 수 없는 값**이다.
+
+```sql
+-- 오답
+WHERE commission = NULL
+
+-- 정답
+WHERE commission IS NULL
+WHERE commission IS NOT NULL
+```
+
+```text
+NULL + 10 = NULL
+NULL = NULL = UNKNOWN
+```
+
+| 표현                       | 결과 기준           |
+| -------------------------- | ------------------- |
+| `COUNT(*)`                 | 모든 행             |
+| `COUNT(column)`            | 해당 열의 NULL 제외 |
+| `SUM`, `AVG`, `MAX`, `MIN` | NULL 제외           |
+
+값이 `10, 20, NULL`이면 `COUNT(*)=3`, `COUNT(column)=2`, `AVG(column)=15`다. NULL 대체는 표준 SQL의 `COALESCE(value, 0)`, Oracle의 `NVL(value, 0)`처럼 DBMS별 문법을 구분한다.
+
+## 4. GROUP BY와 HAVING
+
+```sql
+SELECT department_id,
+       COUNT(*) AS count,
+       AVG(salary) AS average_salary
+FROM employee
+GROUP BY department_id
+HAVING AVG(salary) >= 3000;
+```
+
+집계 쿼리의 SELECT에는 원칙적으로 다음만 올 수 있다.
+
+1. `GROUP BY`에 포함된 열
+2. 집계 함수로 감싼 열
+
+```sql
+-- name이 GROUP BY에도 없고 집계되지 않았으므로 잘못된 형태
+SELECT department_id, name, COUNT(*)
+FROM employee
+GROUP BY department_id;
+```
+
+## 5. JOIN
+
+| JOIN             | 결과                       |
+| ---------------- | -------------------------- |
+| INNER JOIN       | 양쪽 조건이 일치하는 행    |
+| LEFT OUTER JOIN  | 왼쪽 전체 + 오른쪽 일치 행 |
+| RIGHT OUTER JOIN | 오른쪽 전체 + 왼쪽 일치 행 |
+| FULL OUTER JOIN  | 양쪽의 모든 행             |
+| CROSS JOIN       | 가능한 모든 조합           |
+
+```sql
+SELECT e.name, d.department_name
+FROM employee e
+LEFT JOIN department d
+  ON e.department_id = d.department_id;
+```
+
+조인 조건이 없으면 결과 행 수는 `A 행 수 × B 행 수`다. LEFT JOIN 뒤 WHERE에서 오른쪽 테이블을 제한하면 NULL 행이 제거되어 INNER JOIN처럼 동작할 수 있다.
+
+```sql
+-- 왼쪽 행 보존이 목적이면 오른쪽 조건을 ON에 배치
+SELECT e.name, d.department_name
+FROM employee e
+LEFT JOIN department d
+  ON e.department_id = d.department_id
+ AND d.department_name = '개발';
+```
+
+## 6. 서브쿼리
+
+```sql
+-- 전체 평균보다 급여가 높은 직원
+SELECT name
+FROM employee
+WHERE salary > (SELECT AVG(salary) FROM employee);
+
+-- 서울 소재 부서 직원
+SELECT name
+FROM employee
+WHERE department_id IN (
+    SELECT department_id FROM department WHERE location = '서울'
+);
+```
+
+| 연산자   | 의미                     |
+| -------- | ------------------------ |
+| `IN`     | 결과 중 하나와 일치      |
+| `ANY`    | 하나라도 비교 조건 만족  |
+| `ALL`    | 모든 값이 비교 조건 만족 |
+| `EXISTS` | 결과 행이 하나라도 존재  |
+
+```text
+> ANY(10, 20, 30): 최솟값보다 크면 참
+> ALL(10, 20, 30): 최댓값보다 커야 참
+< ANY(10, 20, 30): 최댓값보다 작으면 참
+< ALL(10, 20, 30): 최솟값보다 작아야 참
+```
+
+상관 서브쿼리는 외부 쿼리의 현재 행을 참조한다.
+
+```sql
+SELECT e.name
+FROM employee e
+WHERE e.salary > (
+    SELECT AVG(e2.salary)
+    FROM employee e2
+    WHERE e2.department_id = e.department_id
+);
+```
+
+## 7. 조건과 집합 연산자
+
+```text
+BETWEEN: 양 끝값 포함
+LIKE '%길%': 0개 이상 문자
+LIKE '_길동': 정확히 한 문자
+UNION: 합집합, 중복 제거
+UNION ALL: 합집합, 중복 유지
+INTERSECT: 교집합
+EXCEPT 또는 MINUS: 차집합
+```
+
+집합 연산 대상 SELECT는 열 개수가 같고 대응 자료형이 호환되어야 한다.
+
+## 8. 스키마와 데이터 독립성
+
+| 스키마      | 관점                        |
+| ----------- | --------------------------- |
+| 외부 스키마 | 개별 사용자와 응용 프로그램 |
+| 개념 스키마 | 조직 전체의 논리 구조       |
+| 내부 스키마 | 물리적 저장 구조            |
+
+- 논리적 독립성: 개념 스키마 변경이 외부 스키마에 미치는 영향을 최소화
+- 물리적 독립성: 내부 스키마 변경이 개념 스키마에 미치는 영향을 최소화
+
+## 9. 키와 릴레이션 용어
+
+| 용어       | 핵심                          |
+| ---------- | ----------------------------- |
+| 슈퍼키     | 유일성 만족                   |
+| 후보키     | 유일성 + 최소성               |
+| 기본키     | 선택된 후보키                 |
+| 대체키     | 선택되지 않은 후보키          |
+| 외래키     | 다른 릴레이션의 기본키 참조   |
+| 튜플       | 행                            |
+| 속성       | 열                            |
+| 카디널리티 | 행의 수                       |
+| 차수       | 열의 수                       |
+| 도메인     | 속성이 가질 수 있는 값의 범위 |
+
+## 10. 무결성과 정규화
+
+| 무결성             | 규칙                            |
+| ------------------ | ------------------------------- |
+| 개체 무결성        | 기본키는 중복과 NULL 불가       |
+| 참조 무결성        | 외래키는 참조 대상 값 또는 NULL |
+| 도메인 무결성      | 값은 정의된 도메인에 속해야 함  |
+| 사용자 정의 무결성 | 업무 규칙을 만족해야 함         |
+
+| 정규형 | 제거 대상                          |
+| ------ | ---------------------------------- |
+| 1NF    | 반복 그룹 제거, 속성값 원자화      |
+| 2NF    | 부분 함수 종속 제거                |
+| 3NF    | 이행 함수 종속 제거                |
+| BCNF   | 모든 결정자가 후보키가 되도록 분해 |
+| 4NF    | 다치 종속 제거                     |
+| 5NF    | 조인 종속 제거                     |
+
+```text
+삽입 이상: 원하지 않는 정보까지 넣어야 삽입 가능
+갱신 이상: 중복된 일부만 수정되어 불일치
+삭제 이상: 한 정보를 지우며 필요한 정보까지 삭제
+```
+
+반정규화는 조회 성능을 위해 중복을 허용하는 대신 저장 공간, 변경 비용, 무결성 관리 부담을 늘린다.
+
+## 11. 트랜잭션과 병행 제어
+
+| ACID        | 의미                       |
+| ----------- | -------------------------- |
+| Atomicity   | 전부 수행하거나 전부 취소  |
+| Consistency | 전후의 무결성 유지         |
+| Isolation   | 동시 트랜잭션 간 간섭 방지 |
+| Durability  | 커밋 결과의 영구 보존      |
+
+```text
+Dirty Read: 커밋되지 않은 값을 읽음
+Non-repeatable Read: 같은 행을 다시 읽었는데 값이 바뀜
+Phantom Read: 같은 조건의 행 집합이 추가·삭제로 바뀜
+Lost Update: 한 트랜잭션의 수정이 다른 수정에 덮임
+```
+
+## 12. 시험 직전 10초 점검
+
+```text
+NULL은 IS NULL
+COUNT(*)와 COUNT(column) 구분
+WHERE는 행, HAVING은 그룹
+BETWEEN은 양 끝 포함
+%는 여러 문자, _는 한 문자
+UNION은 중복 제거
+LEFT JOIN의 ON과 WHERE 위치 확인
+후보키는 유일성 + 최소성
+카디널리티는 행, 차수는 열
+2NF는 부분 종속, 3NF는 이행 종속 제거
+```
+
+SQL 결과 문제는 머릿속으로만 풀지 않는다. `FROM/JOIN → WHERE → GROUP BY → HAVING → SELECT`마다 남는 중간 테이블을 그리면 실수를 크게 줄일 수 있다.

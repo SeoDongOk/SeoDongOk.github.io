@@ -1,0 +1,275 @@
+---
+title: '정보처리기사 실기 핵심 개념 17 — GoF 디자인 패턴'
+date: '2026-07-18'
+tags: ['정보처리기사', 'design-pattern', 'gof', 'software-design', 'study']
+draft: false
+summary: 'GoF 생성·구조·행위 패턴 23개를 분류하고 반복 출제되는 Adapter, Bridge, Observer, Strategy 등을 식별어로 정리했다.'
+category: misc
+---
+
+## 시험 직전 빈출도
+
+> **우선순위 S · ★★★★★**
+>
+> 디자인 패턴은 2022·2023·2025년 실기 출제 이력이 확인되는 강한 반복 영역이다.
+
+- **최소 암기:** 생성 5·구조 7·행위 11 분류와 Adapter·Bridge·Proxy·Observer·Strategy 식별어
+- **5점 후보:** Observer=상태 변화 자동 통지 / Strategy=알고리즘 교체 / Bridge=기능과 구현 분리 / Proxy=대리 객체
+- **판정 기준:** 별점은 Q-Net의 공식 출제 확률이 아니다. 2020년 1회~2026년 1회 복원 목록과 2026 시나공 핵심요약의 실기 출제 이력 표기를 개념군 단위로 교차해 정한 **시험 전날 상대 우선순위**다.
+
+디자인 패턴은 긴 정의를 모두 외우기보다 **생성·구조·행위 분류**와 대표 식별어를 연결한다. Adapter, Bridge, Proxy, Observer, Strategy는 특히 먼저 암기한다.
+
+## 1. 디자인 패턴 분류
+
+| 분류      | 목적                             |
+| --------- | -------------------------------- |
+| 생성 패턴 | 객체 생성 과정을 캡슐화          |
+| 구조 패턴 | 클래스와 객체의 조합 구조 설계   |
+| 행위 패턴 | 객체 사이의 책임과 상호작용 설계 |
+
+## 2. 생성 패턴 5개
+
+```text
+Abstract Factory
+Builder
+Factory Method
+Prototype
+Singleton
+```
+
+### Abstract Factory
+
+구체적인 클래스를 지정하지 않고 관련된 객체군을 생성한다.
+
+```text
+관련 제품군
+구체 클래스 감춤
+```
+
+### Builder
+
+복잡한 객체의 생성 과정과 표현을 분리하여 같은 생성 절차로 다른 결과를 만든다.
+
+```text
+단계별 생성
+생성과 표현 분리
+```
+
+### Factory Method
+
+객체 생성 인터페이스는 상위 클래스가 정의하고 실제 생성은 하위 클래스에 위임한다.
+
+```text
+생성을 하위 클래스에 위임
+```
+
+### Prototype
+
+기존 객체를 복제하여 새 객체를 생성한다.
+
+```text
+복사·복제
+```
+
+### Singleton
+
+클래스의 인스턴스를 하나만 생성하고 전역 접근점을 제공한다.
+
+```text
+인스턴스 하나
+```
+
+## 3. 구조 패턴 7개
+
+```text
+Adapter
+Bridge
+Composite
+Decorator
+Facade
+Flyweight
+Proxy
+```
+
+### Adapter
+
+호환되지 않는 인터페이스를 클라이언트가 기대하는 형태로 변환한다.
+
+```text
+인터페이스 변환
+호환성 연결
+```
+
+### Bridge
+
+추상화의 기능 계층과 구현 계층을 분리하여 독립적으로 변경할 수 있게 한다.
+
+```text
+기능과 구현 분리
+두 계층 독립 확장
+```
+
+### Composite
+
+객체를 트리 구조로 구성하여 단일 객체와 복합 객체를 동일하게 다룬다.
+
+```text
+부분-전체 트리
+단일·복합 동일 취급
+```
+
+### Decorator
+
+객체를 감싸 기존 구조를 변경하지 않고 책임과 기능을 동적으로 추가한다.
+
+```text
+감싸서 기능 추가
+```
+
+### Facade
+
+복잡한 하위 시스템에 단순하고 통합된 인터페이스를 제공한다.
+
+```text
+통합 창구
+복잡성 숨김
+```
+
+### Flyweight
+
+많은 작은 객체의 공통 상태를 공유하여 메모리 사용을 줄인다.
+
+```text
+객체 공유
+메모리 절약
+```
+
+### Proxy
+
+실제 객체를 대신하는 대리 객체가 접근을 제어한다.
+
+```text
+대리 객체
+접근 제어
+```
+
+## 4. 행위 패턴 11개
+
+```text
+Chain of Responsibility
+Command
+Interpreter
+Iterator
+Mediator
+Memento
+Observer
+State
+Strategy
+Template Method
+Visitor
+```
+
+### Chain of Responsibility
+
+요청을 처리할 수 있는 객체들을 사슬로 연결해 처리 객체를 찾는다.
+
+### Command
+
+요청을 객체로 캡슐화하여 실행 취소, 큐, 로그 등을 지원한다.
+
+### Interpreter
+
+언어의 문법을 클래스 구조로 표현하고 문장을 해석한다.
+
+### Iterator
+
+컬렉션 내부 구조를 노출하지 않고 요소를 순차 접근한다.
+
+### Mediator
+
+객체 사이의 복잡한 상호작용을 중재 객체에 모은다.
+
+### Memento
+
+캡슐화를 깨지 않고 객체의 이전 상태를 저장하고 복원한다.
+
+### Observer
+
+한 객체의 상태가 바뀌면 의존 객체들에게 자동 통지한다.
+
+```text
+발행-구독
+상태 변화 통지
+```
+
+### State
+
+객체 내부 상태에 따라 행동이 달라지게 한다.
+
+### Strategy
+
+알고리즘군을 각각 캡슐화하여 실행 중 교체할 수 있게 한다.
+
+```text
+알고리즘 교체
+```
+
+### Template Method
+
+알고리즘의 골격은 상위 클래스에 두고 일부 단계는 하위 클래스가 구현한다.
+
+```text
+상위 골격·하위 세부
+```
+
+### Visitor
+
+데이터 구조와 처리 기능을 분리하고 방문자 객체가 각 요소를 방문해 연산한다.
+
+## 5. 혼동 패턴 비교
+
+### Adapter와 Facade
+
+```text
+기존 인터페이스를 다른 형태로 변환 → Adapter
+복잡한 여러 인터페이스를 하나로 단순화 → Facade
+```
+
+### Decorator와 Proxy
+
+```text
+기능·책임을 추가 → Decorator
+접근을 통제·대신 수행 → Proxy
+```
+
+### State와 Strategy
+
+```text
+내부 상태에 따라 행동 변경 → State
+외부에서 알고리즘을 선택·교체 → Strategy
+```
+
+### Factory Method와 Abstract Factory
+
+```text
+하위 클래스에 한 객체 생성 위임 → Factory Method
+관련된 객체 제품군 생성 → Abstract Factory
+```
+
+## 6. 시험 직전 암기
+
+```text
+생성: 추빌팩프싱
+구조: 어브컴데퍼플프
+인터페이스 변환 = Adapter
+기능과 구현 분리 = Bridge
+트리의 단일·복합 = Composite
+감싸서 기능 추가 = Decorator
+통합 창구 = Facade
+공유로 메모리 절약 = Flyweight
+대리 접근 = Proxy
+상태 변화 통지 = Observer
+알고리즘 교체 = Strategy
+상위 골격·하위 구현 = Template Method
+이전 상태 저장 = Memento
+```

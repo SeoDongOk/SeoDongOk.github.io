@@ -1,0 +1,422 @@
+---
+title: '정보처리기사 실기 — 값·참조 비교와 Java 타입 판별 완전 정리'
+date: '2026-07-18'
+tags: ['정보처리기사', 'java', 'c', 'python', 'type-checking', 'reference', 'study']
+draft: false
+summary: 'Java의 ==·equals·instanceof·getClass·다운캐스팅과 선언 타입·실제 타입의 차이를 중심으로 C와 Python의 비교 방법까지 정리했다.'
+category: misc
+---
+
+정보처리기사 실기 코드 문제에는 겉보기에는 서로 다른 문제지만 사실 하나의 원리로 풀리는 유형이 많다.
+
+> **변수가 가진 값인가, 객체의 주소인가, 선언 타입인가, 실제 객체 타입인가?**
+
+문제를 읽으면서 이 네 가지를 구분하면 문자열 비교, 배열 복사, 오버라이딩, 다운캐스팅 문제를 함께 해결할 수 있다.
+
+## 1. Java 문자열의 ==와 equals
+
+```java
+String a = "java";
+String b = "java";
+String c = new String("java");
+
+System.out.print((a == b) + " ");
+System.out.print((a == c) + " ");
+System.out.print(a.equals(c));
+```
+
+정답은 다음과 같다.
+
+```text
+true false true
+```
+
+### 문자열 풀과 new String
+
+문자열 리터럴은 문자열 풀에서 재사용된다.
+
+```text
+문자열 풀
+"java" ← a
+       ← b
+
+힙
+별도의 "java" 객체 ← c
+```
+
+- <code>a == b</code>: 같은 객체를 가리키므로 <code>true</code>
+- <code>a == c</code>: 서로 다른 객체를 가리키므로 <code>false</code>
+- <code>a.equals(c)</code>: 문자열 내용이 같으므로 <code>true</code>
+
+### 핵심 비교표
+
+| 대상                | ==                        | equals                            |
+| ------------------- | ------------------------- | --------------------------------- |
+| int, char 등 기본형 | 값 비교                   | 사용 불가                         |
+| 일반 객체           | 참조 비교                 | 클래스의 구현에 따라 내용 비교    |
+| String              | 같은 문자열 객체인지 비교 | 문자열 내용 비교                  |
+| 배열                | 같은 배열 객체인지 비교   | 기본적으로 참조 비교              |
+| 배열 내용           | 비교 불가                 | <code>Arrays.equals()</code> 사용 |
+
+```java
+int[] a = {1, 2};
+int[] b = {1, 2};
+
+System.out.println(a == b);              // false
+System.out.println(a.equals(b));         // false
+System.out.println(Arrays.equals(a, b)); // true
+```
+
+## 2. 선언 타입과 실제 객체 타입
+
+```java
+Parent p = new Child();
+```
+
+이 한 줄에는 타입이 두 개 존재한다.
+
+```text
+선언 타입: Parent
+실제 객체: Child
+```
+
+시험에서는 무엇을 선언 타입으로 결정하고 무엇을 실제 객체로 결정하는지가 중요하다.
+
+| 구분              | 결정 기준                         |
+| ----------------- | --------------------------------- |
+| 인스턴스 필드     | 선언 타입                         |
+| 오버로딩          | 선언 타입과 컴파일 시점 인자 타입 |
+| static 메서드     | 선언 타입                         |
+| 오버라이딩 메서드 | 실제 객체                         |
+| instanceof        | 실제 객체와 상속 관계             |
+| getClass()        | 정확한 실제 클래스                |
+
+### 시험 암기
+
+> **필드·static·오버로딩은 선언 타입, 오버라이딩·instanceof는 실제 객체**
+
+## 3. instanceof
+
+<code>instanceof</code>는 실제 객체를 해당 타입으로 취급할 수 있는지 검사한다.
+
+```java
+class Parent {}
+class Child extends Parent {}
+
+Parent p = new Child();
+
+System.out.println(p instanceof Parent); // true
+System.out.println(p instanceof Child);  // true
+```
+
+실제 객체가 <code>Child</code>이고 <code>Child</code>는 <code>Parent</code>를 상속하므로 둘 다 참이다.
+
+```java
+Parent p = null;
+System.out.println(p instanceof Parent); // false
+```
+
+참조가 <code>null</code>이면 <code>instanceof</code> 결과는 거짓이다.
+
+## 4. instanceof와 getClass의 차이
+
+```java
+Parent p = new Child();
+
+System.out.println(p instanceof Parent);       // true
+System.out.println(p.getClass() == Parent.class); // false
+System.out.println(p.getClass() == Child.class);  // true
+```
+
+| 표현                                      | 질문                          |
+| ----------------------------------------- | ----------------------------- |
+| <code>p instanceof Parent</code>          | Parent 또는 그 자식 타입인가? |
+| <code>p.getClass() == Parent.class</code> | 정확히 Parent 객체인가?       |
+
+<code>instanceof</code>는 상속 관계를 인정하지만 <code>getClass()</code>는 정확한 클래스만 비교한다.
+
+## 5. 업캐스팅과 다운캐스팅
+
+### 업캐스팅
+
+```java
+Parent p = new Child();
+```
+
+자식 객체를 부모 타입 변수에 저장하는 것은 업캐스팅이다. 자동으로 수행된다.
+
+### 다운캐스팅
+
+```java
+if (p instanceof Child) {
+    Child c = (Child) p;
+}
+```
+
+부모 타입 참조를 자식 타입으로 되돌리는 것이 다운캐스팅이다.
+
+```java
+Parent p = new Parent();
+Child c = (Child) p; // ClassCastException
+```
+
+실제 객체가 자식 타입이 아니면 실행 중 <code>ClassCastException</code>이 발생한다. 따라서 <code>instanceof</code>로 먼저 검사하는 형태를 기억한다.
+
+## 6. instanceof 기출형 추적
+
+```java
+class Parent {}
+
+class Child extends Parent {
+    int value = 7;
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Parent p = new Child();
+
+        System.out.print((p instanceof Child) + " ");
+        System.out.print(((Child) p).value);
+    }
+}
+```
+
+실행 과정은 다음과 같다.
+
+```text
+p의 선언 타입 = Parent
+p의 실제 객체 = Child
+
+p instanceof Child → true
+(Child) p          → 안전한 다운캐스팅
+.value             → 7
+```
+
+정답:
+
+```text
+true 7
+```
+
+## 7. 필드와 오버라이딩의 차이
+
+```java
+class Parent {
+    int value = 1;
+    void show() {
+        System.out.print("P");
+    }
+}
+
+class Child extends Parent {
+    int value = 2;
+
+    @Override
+    void show() {
+        System.out.print("C");
+    }
+}
+
+Parent p = new Child();
+
+System.out.print(p.value);
+p.show();
+```
+
+정답은 <code>1C</code>다.
+
+- <code>p.value</code>: 필드이므로 선언 타입 <code>Parent</code> 기준
+- <code>p.show()</code>: 오버라이딩 메서드이므로 실제 객체 <code>Child</code> 기준
+
+## 8. 오버로딩과 오버라이딩
+
+```java
+class Parent {
+    String f(Object value) {
+        return "Parent-Object";
+    }
+}
+
+class Child extends Parent {
+    @Override
+    String f(Object value) {
+        return "Child-Object";
+    }
+
+    String f(String value) {
+        return "Child-String";
+    }
+}
+
+Parent p = new Child();
+System.out.println(p.f("java"));
+```
+
+1. 오버로딩 선택은 컴파일 시점에 수행된다.
+2. 선언 타입 <code>Parent</code>에서 호출 가능한 <code>f(Object)</code>가 선택된다.
+3. 그 메서드가 오버라이딩됐으므로 실제 객체 <code>Child</code>의 <code>f(Object)</code>가 실행된다.
+
+정답은 <code>Child-Object</code>다.
+
+## 9. Integer 오토박싱 캐시
+
+```java
+Integer a = 127;
+Integer b = 127;
+Integer c = 128;
+Integer d = 128;
+
+System.out.println(a == b); // true
+System.out.println(c == d); // false
+```
+
+일반적인 Java 구현에서는 <code>-128~127</code> 범위의 <code>Integer</code> 객체를 캐시한다.
+
+- 127은 캐시된 같은 객체를 참조한다.
+- 128은 별도 객체가 될 수 있으므로 참조가 다르다.
+- 숫자 객체의 내용 비교는 <code>equals()</code>를 사용하는 것이 안전하다.
+
+```java
+System.out.println(c.equals(d)); // true
+```
+
+## 10. 배열 별칭과 복제
+
+```java
+int[] a = {1, 2, 3};
+int[] b = a;
+int[] c = a.clone();
+
+b[0] = 9;
+c[1] = 8;
+
+System.out.println(a[0]); // 9
+System.out.println(a[1]); // 2
+System.out.println(c[1]); // 8
+```
+
+```text
+a ─┐
+   ├→ 배열① {9, 2, 3}
+b ─┘
+
+c ───→ 배열② {1, 8, 3}
+```
+
+- <code>b = a</code>: 같은 배열을 가리키는 별칭
+- <code>c = a.clone()</code>: 별도의 배열 생성
+
+단, 객체가 들어 있는 중첩 구조에서는 <code>clone()</code>도 내부 객체를 공유하는 얕은 복사가 될 수 있다.
+
+## 11. C 문자열과 주소 비교
+
+C에는 Java의 <code>equals()</code>가 없다. 문자열 내용은 <code>strcmp()</code>로 비교한다.
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    char a[] = "java";
+    char b[] = "java";
+
+    printf("%d", strcmp(a, b));
+}
+```
+
+두 문자열이 같으면 <code>strcmp()</code>는 <code>0</code>을 반환한다.
+
+```c
+strcmp(a, b) == 0  // 문자열 내용이 같음
+```
+
+### C 비교 공식
+
+| 표현                           | 의미                                  |
+| ------------------------------ | ------------------------------------- |
+| <code>p == q</code>            | 두 포인터의 주소가 같은가             |
+| <code>*p == *q</code>          | 두 포인터가 가리키는 현재 값이 같은가 |
+| <code>strcmp(a, b) == 0</code> | 두 문자열의 내용이 같은가             |
+
+## 12. C에는 instanceof가 없다
+
+C는 Java처럼 객체의 실제 타입 정보를 자동으로 보관하지 않는다.
+
+```c
+int *p;
+```
+
+컴파일러는 선언된 타입을 기준으로 검사하지만, 실행 중 <code>p</code>가 실제로 올바른 데이터를 가리키는지 자동으로 확인하지 않는다.
+
+```c
+sizeof(p)
+```
+
+<code>sizeof</code>는 타입 판별 함수가 아니다. 변수나 타입이 차지하는 메모리 크기를 구할 뿐이다.
+
+## 13. Python의 type과 isinstance
+
+Python에서는 다음 두 가지를 구분한다.
+
+```python
+class Parent:
+    pass
+
+class Child(Parent):
+    pass
+
+value = Child()
+
+print(type(value) is Parent)       # False
+print(type(value) is Child)        # True
+print(isinstance(value, Parent))   # True
+print(isinstance(value, Child))    # True
+```
+
+| 표현                                   | Java 대응                              | 의미           |
+| -------------------------------------- | -------------------------------------- | -------------- |
+| <code>type(value) is Child</code>      | <code>getClass() == Child.class</code> | 정확한 타입    |
+| <code>isinstance(value, Parent)</code> | <code>value instanceof Parent</code>   | 상속 관계 포함 |
+
+## 14. 시험장에서 그리는 참조 지도
+
+참조형 변수가 나오면 변수 옆에 화살표를 그린다.
+
+```text
+a → 객체①
+b → 객체①
+c → 객체②
+```
+
+그다음 연산자를 확인한다.
+
+- <code>==</code>: 두 화살표의 목적지가 같은가?
+- <code>equals()</code>: 객체의 내용이 같은가?
+- <code>instanceof</code>: 실제 객체를 해당 타입으로 취급할 수 있는가?
+- <code>getClass()</code>: 실제 클래스가 정확히 일치하는가?
+- 캐스팅: 실제 객체가 변환 대상 타입인가?
+
+## 15. 최종 암기 카드
+
+```text
+Java 기본형 ==       → 값 비교
+Java 객체 ==         → 참조 비교
+String.equals()      → 문자열 내용 비교
+Arrays.equals()      → 배열 내용 비교
+
+instanceof           → 상속 관계 포함
+getClass()           → 정확한 실제 타입
+안전한 다운캐스팅    → instanceof로 먼저 확인
+
+필드·static·오버로딩 → 선언 타입
+오버라이딩           → 실제 객체
+
+C 포인터 ==          → 주소 비교
+C strcmp(a, b) == 0  → 문자열 내용 동일
+C sizeof             → 크기 계산, 타입 판별 아님
+
+Python type()        → 정확한 타입
+Python isinstance()  → 상속 관계 포함
+```
+
+이 유형의 핵심은 문법을 따로 외우는 것이 아니라 매 순간 **값, 주소, 선언 타입, 실제 타입 중 무엇을 비교하는지** 확인하는 것이다.

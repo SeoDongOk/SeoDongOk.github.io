@@ -1,0 +1,601 @@
+---
+title: '정보처리기사 실기 C언어 — 특이하지만 빈출하는 함수·연산자 총정리'
+date: '2026-07-19'
+tags: ['정보처리기사', 'c-language', 'string.h', 'strcmp', 'pointer', 'programming', 'study']
+draft: false
+summary: 'strcmp, strlen, sizeof, strcpy, strcat, strstr, atoi, ctype 함수와 printf 형식 지정자의 시험 함정을 출력 추적 예제로 정리했다.'
+category: misc
+---
+
+C언어 실기 문제는 복잡한 알고리즘보다 **함수의 특이한 반환값과 배열·포인터의 차이**를 알고 있는지 묻는 경우가 많다.
+
+특히 문자열은 별도의 자료형이 아니라 널 문자로 끝나는 <code>char</code> 배열이므로 Java나 Python과 다른 방식으로 처리한다.
+
+## 시험 직전 우선순위
+
+| 우선순위          | 반드시 확인할 내용                                                                                       |
+| ----------------- | -------------------------------------------------------------------------------------------------------- |
+| **S · 최우선**    | <code>strcmp</code>, <code>strlen</code>과 <code>sizeof</code>, <code>printf</code> 형식 지정자          |
+| **A · 빈출 대비** | <code>strcpy</code>, <code>strcat</code>, <code>strchr</code>, <code>strstr</code>, 배열과 포인터        |
+| **B · 추가 득점** | <code>atoi</code>, <code>isdigit</code>, <code>toupper</code>, <code>memcpy</code>, <code>memmove</code> |
+
+이 등급은 공식 출제 확률이 아니라 공개된 정보처리기사 복원 문제와 학습 자료를 기준으로 정한 시험 직전 상대 우선순위다.
+
+## 1. strcmp — 같으면 0
+
+```c
+#include <string.h>
+
+strcmp(문자열1, 문자열2)
+```
+
+| 반환값 | 의미                                  |
+| -----: | ------------------------------------- |
+|    `0` | 두 문자열의 내용이 같다               |
+|   음수 | 첫 번째 문자열이 사전식으로 앞선다    |
+|   양수 | 첫 번째 문자열이 사전식으로 뒤에 있다 |
+
+```c
+printf("%d ", strcmp("cat", "cat") == 0);
+printf("%d", strcmp("cat", "dog") < 0);
+```
+
+실행 과정:
+
+```text
+strcmp("cat", "cat") → 0
+0 == 0               → 1
+
+strcmp("cat", "dog") → 음수
+음수 < 0              → 1
+```
+
+정답:
+
+```text
+1 1
+```
+
+### 반드시 피할 오답
+
+```c
+strcmp("cat", "cat") == 1  // 거짓
+```
+
+문자열이 같으면 <code>strcmp()</code> 자체가 0을 반환한다. 단, 이를 <code>== 0</code>과 비교한 전체 조건식은 참이므로 1이 된다.
+
+### 정확한 음수·양수 값은 외우지 않는다
+
+C 표준이 보장하는 것은 반환값의 **부호**뿐이다.
+
+```c
+strcmp("a", "c") < 0
+```
+
+위 조건은 참이지만 함수가 반드시 <code>-1</code>을 반환한다고 가정하면 안 된다.
+
+### 암기
+
+> **같공·앞음·뒤양**: 같으면 0, 앞서면 음수, 뒤면 양수
+
+## 2. strlen — 널 문자 제외
+
+```c
+char text[] = "cat";
+
+printf("%zu", strlen(text));
+```
+
+문자열의 문자 수는 3이므로 다음을 출력한다.
+
+```text
+3
+```
+
+메모리에는 널 문자까지 저장되어 있다.
+
+```text
+'c' 'a' 't' '\0'
+```
+
+그러나 <code>strlen()</code>은 <code>\0</code> 직전까지의 문자 수만 센다.
+
+### 반환형은 size_t
+
+<code>strlen()</code>의 반환형은 <code>size_t</code>다. 출력에는 <code>%zu</code>를 사용하는 것이
+정확하다.
+
+```c
+printf("%zu", strlen(text));
+```
+
+시험 코드에서 <code>%d</code>를 사용하기도 하지만 타입상 올바른 형식은 <code>%zu</code>다.
+
+## 3. sizeof — 함수가 아니라 연산자
+
+```c
+char text[] = "cat";
+
+printf("%zu ", strlen(text));
+printf("%zu", sizeof(text));
+```
+
+정답:
+
+```text
+3 4
+```
+
+| 표현                      | 결과 | 이유                        |
+| ------------------------- | ---: | --------------------------- |
+| <code>strlen(text)</code> |    3 | 널 문자 제외                |
+| <code>sizeof(text)</code> |    4 | 널 문자 포함 배열 전체 크기 |
+
+### 배열과 포인터의 sizeof
+
+```c
+char text[] = "cat";
+char *p = text;
+
+printf("%zu ", sizeof(text));
+printf("%zu", sizeof(p));
+```
+
+- <code>sizeof(text)</code>: 문자 배열 전체 크기
+- <code>sizeof(p)</code>: 포인터 변수 자체의 크기
+
+64비트 환경에서는 포인터 크기가 흔히 8바이트지만 시험에서 환경 조건 없이 포인터 크기를 단정하는 문제는 주의한다.
+
+### 함수 매개변수에서는 배열 크기를 잃는다
+
+```c
+void check(int a[]) {
+    printf("%zu", sizeof(a));
+}
+```
+
+함수 매개변수의 <code>int a[]</code>는 실제로 <code>int \*a</code>와 같이 처리된다. 따라서 <code>sizeof(a)</code>는 원본 배열 전체가 아니라 포인터 크기다.
+
+## 4. strcpy — 원본을 목적지로 복사
+
+```c
+char destination[10];
+char source[] = "cat";
+
+strcpy(destination, source);
+printf("%s", destination);
+```
+
+정답:
+
+```text
+cat
+```
+
+인자 순서를 기억한다.
+
+```text
+strcpy(목적지, 원본)
+```
+
+### 반환값
+
+<code>strcpy()</code>는 목적지 포인터를 반환한다.
+
+```c
+char destination[10];
+
+printf("%s", strcpy(destination, "cat"));
+```
+
+정답:
+
+```text
+cat
+```
+
+### 함정
+
+목적지 배열에는 널 문자까지 들어갈 충분한 공간이 있어야 한다.
+
+```c
+char destination[3];
+strcpy(destination, "cat"); // 공간 부족: 최소 4바이트 필요
+```
+
+이 코드는 정의되지 않은 동작을 일으킬 수 있다.
+
+## 5. strncpy — 자동 널 종료를 보장하지 않는다
+
+```c
+char destination[4];
+
+strncpy(destination, "hello", 3);
+destination[3] = '\0';
+```
+
+<code>strncpy()</code>는 지정한 개수만큼 복사한다. 원본이 제한 길이보다 길거나 같으면 목적지 끝에 널
+문자를 자동으로 추가하지 않을 수 있다.
+
+따라서 문자열로 사용할 때는 종료 문자를 직접 보장해야 한다.
+
+## 6. strcat — 목적지 뒤에 연결
+
+```c
+char text[10] = "cat";
+
+strcat(text, "s");
+printf("%s", text);
+```
+
+정답:
+
+```text
+cats
+```
+
+인자 순서는 다음과 같다.
+
+```text
+strcat(뒤에 붙임을 받을 목적지, 추가할 문자열)
+```
+
+### 반환값
+
+<code>strcat()</code>도 목적지 포인터를 반환한다.
+
+```c
+printf("%s", strcat(text, "!"));
+```
+
+### 함정
+
+목적지는 이미 정상적으로 널 종료된 문자열이어야 하고, 연결 결과를 담을 충분한 공간이 있어야 한다.
+
+## 7. strchr — 문자의 첫 위치를 포인터로 반환
+
+```c
+char text[] = "banana";
+char *p = strchr(text, 'a');
+
+printf("%s", p);
+```
+
+<code>p</code>는 첫 번째 <code>'a'</code>의 주소를 가리킨다. <code>%s</code>는 그 위치부터 널
+문자까지 출력한다.
+
+정답:
+
+```text
+anana
+```
+
+찾지 못하면 <code>NULL</code>을 반환한다.
+
+```c
+if (strchr(text, 'z') == NULL) {
+    printf("없음");
+}
+```
+
+### strchr와 strrchr
+
+| 함수                 | 찾는 위치              |
+| -------------------- | ---------------------- |
+| <code>strchr</code>  | 처음 등장한 문자       |
+| <code>strrchr</code> | 마지막으로 등장한 문자 |
+
+```c
+printf("%s", strrchr("banana", 'a'));
+```
+
+정답:
+
+```text
+a
+```
+
+## 8. strstr — 부분 문자열의 시작 주소 반환
+
+```c
+char text[] = "information";
+char *p = strstr(text, "format");
+
+printf("%s", p);
+```
+
+<code>"format"</code>이 시작하는 위치의 주소를 반환하므로 해당 위치부터 끝까지 출력한다.
+
+```text
+formation
+```
+
+찾지 못하면 <code>NULL</code>이다.
+
+### strcmp와 strstr 구분
+
+| 함수                | 목적             | 성공 결과          |
+| ------------------- | ---------------- | ------------------ |
+| <code>strcmp</code> | 문자열 비교      | 같으면 0           |
+| <code>strstr</code> | 부분 문자열 검색 | 발견 위치의 포인터 |
+
+## 9. strlen·strcpy·strcat·strcmp 한 번에 추적
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    char a[20] = "ab";
+    char b[] = "cd";
+
+    strcat(a, b);
+    strcpy(b, "xy");
+
+    printf("%s %s %zu %d",
+           a,
+           b,
+           strlen(a),
+           strcmp(a, "abcd") == 0);
+}
+```
+
+추적:
+
+```text
+a = "ab"
+b = "cd"
+
+strcat(a, b)  → a = "abcd"
+strcpy(b,"xy") → b = "xy"
+strlen(a)      → 4
+strcmp(a,"abcd") → 0
+0 == 0           → 1
+```
+
+정답:
+
+```text
+abcd xy 4 1
+```
+
+## 10. atoi — 문자열의 앞부분을 정수로 변환
+
+```c
+#include <stdlib.h>
+
+printf("%d", atoi("123"));
+```
+
+정답:
+
+```text
+123
+```
+
+문자열 앞에서 변환 가능한 정수 부분을 읽는다.
+
+```c
+printf("%d ", atoi("12abc"));
+printf("%d", atoi("abc"));
+```
+
+일반적인 결과:
+
+```text
+12 0
+```
+
+### 함정
+
+<code>atoi()</code>의 0만 보고 입력이 실제 문자열 <code>"0"</code>이었는지 변환 실패였는지 구분할 수
+없다. 실무에서는 오류를 확인할 수 있는 <code>strtol()</code>이 더 안전하지만, 실기 출력 추적에서는
+<code>atoi()</code>의 변환 결과를 묻는 경우를 대비한다.
+
+## 11. ctype.h 문자 판별 함수
+
+```c
+#include <ctype.h>
+```
+
+| 함수                    | 의미                 |
+| ----------------------- | -------------------- |
+| <code>isdigit(c)</code> | 숫자인가             |
+| <code>isalpha(c)</code> | 영문자인가           |
+| <code>isalnum(c)</code> | 영문자 또는 숫자인가 |
+| <code>islower(c)</code> | 소문자인가           |
+| <code>isupper(c)</code> | 대문자인가           |
+| <code>tolower(c)</code> | 소문자로 변환        |
+| <code>toupper(c)</code> | 대문자로 변환        |
+
+```c
+printf("%d %c", isdigit('7') != 0, toupper('a'));
+```
+
+정답:
+
+```text
+1 A
+```
+
+판별 함수는 참일 때 반드시 1만 반환한다고 가정하지 말고 **0이 아닌 값**을 반환한다고 이해한다.
+
+```c
+isdigit('7') != 0
+```
+
+위와 같이 비교하면 참·거짓을 1 또는 0으로 출력할 수 있다.
+
+## 12. printf 형식 지정자
+
+| 형식              | 의미             | 대표 예       |
+| ----------------- | ---------------- | ------------- |
+| <code>%d</code>   | 10진수 정수      | 32            |
+| <code>%u</code>   | 부호 없는 정수   | 32            |
+| <code>%x</code>   | 16진수 소문자    | 20            |
+| <code>%X</code>   | 16진수 대문자    | 20            |
+| <code>%o</code>   | 8진수            | 40            |
+| <code>%c</code>   | 문자 하나        | A             |
+| <code>%s</code>   | 널 종료 문자열   | apple         |
+| <code>%f</code>   | 실수             | 3.140000      |
+| <code>%.2f</code> | 소수점 둘째 자리 | 3.14          |
+| <code>%p</code>   | 주소             | 구현별 주소   |
+| <code>%zu</code>  | size_t           | strlen·sizeof |
+| <code>%%</code>   | 퍼센트 문자      | %             |
+
+### 10진수 32의 진법별 출력
+
+```c
+printf("%d %x %o", 32, 32, 32);
+```
+
+정답:
+
+```text
+32 20 40
+```
+
+값은 같지만 출력 형식만 다르다.
+
+## 13. printf 폭과 정밀도
+
+```c
+printf("%6.2f", 3.5);
+```
+
+- 전체 출력 폭: 6칸
+- 소수점 이하: 2자리
+- 남는 공간: 왼쪽 공백
+
+```text
+  3.50
+```
+
+```c
+printf("%-6.2fX", 3.5);
+```
+
+<code>-</code>가 있으면 왼쪽 정렬한다.
+
+```text
+3.50  X
+```
+
+## 14. scanf의 & 함정
+
+```c
+int number;
+char text[10];
+
+scanf("%d", &number);
+scanf("%s", text);
+```
+
+- 일반 변수에는 주소 연산자 <code>&</code>가 필요하다.
+- 문자 배열 이름 <code>text</code>는 이미 첫 원소의 주소로 변환되므로 <code>&</code>를 붙이지 않는다.
+
+시험 암기:
+
+```text
+int·char 단일 변수 → &변수
+char 배열 문자열  → 배열 이름
+```
+
+실무에서는 문자열 버퍼 크기를 제한한다.
+
+```c
+scanf("%9s", text);
+```
+
+## 15. memcpy와 memmove
+
+```c
+#include <string.h>
+```
+
+| 함수                 | 특징                                         |
+| -------------------- | -------------------------------------------- |
+| <code>memcpy</code>  | 지정한 바이트 수를 복사, 영역이 겹치면 안 됨 |
+| <code>memmove</code> | 복사 영역이 겹쳐도 처리 가능                 |
+
+```c
+int source[] = {1, 2, 3};
+int destination[3];
+
+memcpy(destination, source, sizeof(source));
+```
+
+<code>sizeof(source)</code>만큼의 바이트를 복사하므로 세 정수가 모두 복사된다.
+
+### 문자열 함수와 차이
+
+- <code>strcpy</code>: 널 문자를 만날 때까지 문자열 복사
+- <code>memcpy</code>: 지정한 바이트 수만큼 그대로 복사
+
+## 16. 포인터 출력 함정
+
+```c
+char text[] = "Art";
+char *p = text;
+
+printf("%s ", p);
+printf("%c ", *p);
+printf("%c", *(p + 1));
+```
+
+추적:
+
+```text
+p       → 첫 문자 주소
+%s, p   → 주소부터 널 문자까지 "Art"
+*p      → 첫 문자 'A'
+*(p+1)  → 다음 문자 'r'
+```
+
+정답:
+
+```text
+Art A r
+```
+
+배열과 포인터가 결합된 문자열 출력은 실제 복원 문제에서도 반복되는 유형이다.
+
+## 17. 최종 암기 카드
+
+```text
+strcmp(a,b) == 0  → 문자열 내용 동일
+strcmp(a,b) < 0   → a가 사전식으로 앞
+strcmp(a,b) > 0   → a가 사전식으로 뒤
+
+strlen(s)         → \0 제외 길이
+sizeof(char 배열) → \0 포함 배열 크기
+sizeof(포인터)    → 포인터 변수 크기
+
+strcpy(dst,src)   → src를 dst로 복사
+strcat(dst,src)   → dst 뒤에 src 연결
+strchr(s,c)       → 문자 c의 첫 위치 포인터
+strstr(s,sub)     → 부분 문자열 시작 포인터
+
+atoi("12abc")     → 12
+isdigit('7')      → 0이 아닌 참
+toupper('a')      → 'A'
+
+%d 10진수
+%x 16진수
+%o 8진수
+%c 문자
+%s 문자열
+%.2f 소수 둘째 자리
+%zu size_t
+
+scanf 일반 변수  → & 필요
+scanf 문자 배열  → 배열 이름 자체가 주소
+```
+
+## 18. 검증 자료
+
+- [C 표준 라이브러리 string.h 함수 목록](https://ko.cppreference.net/c/header/string.html)
+- [정보처리기사 실기 C 문자열·포인터 복원 문제](https://www.sqldpass.com/q/11278)
+- [2026 정보처리기사 실기 핵심요약의 C 배열·포인터 설명](https://www.sinagong.co.kr/pds/001001002/books/1074/download-data/297)
+
+복원 문제는 비공식 자료이므로 실제 시험과 코드 표현이 다를 수 있다. 시험 직전에는 함수 전체를 외우기보다 **반환값, 널 문자 포함 여부, 주소와 값의 차이**를 우선 확인한다.

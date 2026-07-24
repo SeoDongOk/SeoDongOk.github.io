@@ -10,13 +10,14 @@ const CAT_COLOR: Record<string, string> = {
   quant: '#c8a06a',
   infra: '#7aabcc',
   japan: '#cc7a9a',
+  physics: '#8a7ac0',
   misc: '#888',
 }
 
 const CAT_LABEL: Record<Language, Record<string, string>> = {
-  ko: { quant: '퀀트', infra: '인프라', japan: '일본어', misc: '기타' },
-  ja: { quant: 'クオンツ', infra: 'インフラ', japan: '日本語', misc: 'その他' },
-  en: { quant: 'Quant', infra: 'Infra', japan: 'Japanese', misc: 'Misc' },
+  ko: { quant: '퀀트', infra: '인프라', japan: '일본어', physics: '물리학', misc: '기타' },
+  ja: { quant: 'クオンツ', infra: 'インフラ', japan: '日本語', physics: '物理学', misc: 'その他' },
+  en: { quant: 'Quant', infra: 'Infra', japan: 'Japanese', physics: 'Physics', misc: 'Misc' },
 }
 
 const CATS_LABEL: Record<Language, { id: string; label: string }[]> = {
@@ -25,18 +26,21 @@ const CATS_LABEL: Record<Language, { id: string; label: string }[]> = {
     { id: 'quant', label: '퀀트' },
     { id: 'infra', label: '인프라' },
     { id: 'japan', label: '일본어' },
+    { id: 'physics', label: '물리학' },
   ],
   ja: [
     { id: 'all', label: 'すべて' },
     { id: 'quant', label: 'クオンツ' },
     { id: 'infra', label: 'インフラ' },
     { id: 'japan', label: '日本語' },
+    { id: 'physics', label: '物理学' },
   ],
   en: [
     { id: 'all', label: 'All' },
     { id: 'quant', label: 'Quant' },
     { id: 'infra', label: 'Infra' },
     { id: 'japan', label: 'Japanese' },
+    { id: 'physics', label: 'Physics' },
   ],
 }
 

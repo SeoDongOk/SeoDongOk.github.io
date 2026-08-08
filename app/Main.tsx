@@ -56,6 +56,7 @@ const homeCopy: Record<
     readAll: string
     stratBacktest: string
     japanese: string
+    japaneseNote: string
   }
 > = {
   ko: {
@@ -69,6 +70,7 @@ const homeCopy: Record<
     readAll: '전체 글 읽기 →',
     stratBacktest: '전략 백테스트',
     japanese: '일본어',
+    japaneseNote: '성적 대기 중 · N2 준비 중',
   },
   ja: {
     heroDesc:
@@ -81,6 +83,7 @@ const homeCopy: Record<
     readAll: '全文を読む →',
     stratBacktest: '戦略バックテスト',
     japanese: '日本語',
+    japaneseNote: '結果待ち · N2 準備中',
   },
   en: {
     heroDesc:
@@ -93,6 +96,7 @@ const homeCopy: Record<
     readAll: 'Read full post →',
     stratBacktest: 'Backtests',
     japanese: 'Japanese',
+    japaneseNote: 'Result pending · N2 in progress',
   },
 }
 
@@ -423,7 +427,7 @@ export default function Home({ posts }: { posts: Post[] }) {
           { k: 'Posts', v: String(posts.length) },
           { k: 'Tags', v: String(tagCount) },
           { k: copy.stratBacktest, v: '12개' },
-          { k: copy.japanese, v: 'JLPT N5' },
+          { k: copy.japanese, v: 'JLPT N4', sub: copy.japaneseNote },
         ].map((s, i, a) => (
           <div
             key={s.k}
@@ -438,6 +442,11 @@ export default function Home({ posts }: { posts: Post[] }) {
             <span style={{ color: 'var(--color-accent)' }} className="text-xl font-bold">
               {s.v}
             </span>
+            {s.sub && (
+              <span className="text-[10px] leading-snug text-stone-400 dark:text-stone-500">
+                {s.sub}
+              </span>
+            )}
           </div>
         ))}
       </div>

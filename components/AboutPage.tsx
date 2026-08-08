@@ -55,7 +55,7 @@ const EDUCATION = [
   },
   {
     title: 'Languages',
-    desc: 'Korean — native    ·    English — business, interview-capable    ·    Japanese — JLPT N2 target Dec 2026, N1 target 2027',
+    desc: 'Korean — native    ·    English — business, interview-capable    ·    Japanese — JLPT N4 sat, result pending; N2 in progress, N1 target 2027',
     accent: 'bg-[var(--color-up)]',
   },
 ]

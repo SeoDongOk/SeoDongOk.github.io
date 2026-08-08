@@ -54,9 +54,19 @@ const EDUCATION = [
     accent: 'bg-[var(--color-cat-japan)]',
   },
   {
+    title: 'CFA Level 1',
+    desc: 'Targeting the February 2027 sitting  ·  Working through a 300-hour plan, writing up each topic as I go. Quantitative methods notes double as the theory layer under the trading bots.',
+    accent: 'bg-[var(--color-up)]',
+  },
+  {
     title: 'Languages',
     desc: 'Korean — native    ·    English — business, interview-capable    ·    Japanese — JLPT N4 sat, result pending; N2 in progress, N1 target 2027',
-    accent: 'bg-[var(--color-up)]',
+    accent: 'bg-[var(--color-cat-infra)]',
+  },
+  {
+    title: 'Kanji',
+    desc: 'Daily kanji drilling toward N2: radicals, reading traps, and N4→N2 vocabulary gaps. Notes published as I hit each wall — the readings, not just the meanings.',
+    accent: 'bg-[var(--color-cat-japan)]',
   },
 ]
 

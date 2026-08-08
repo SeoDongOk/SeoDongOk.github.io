@@ -10,14 +10,36 @@ const CAT_COLOR: Record<string, string> = {
   quant: '#c8a06a',
   infra: '#7aabcc',
   japan: '#cc7a9a',
+  cfa: '#6fae8e',
   physics: '#8a7ac0',
   misc: '#888',
 }
 
 const CAT_LABEL: Record<Language, Record<string, string>> = {
-  ko: { quant: '퀀트', infra: '인프라', japan: '일본어', physics: '물리학', misc: '기타' },
-  ja: { quant: 'クオンツ', infra: 'インフラ', japan: '日本語', physics: '物理学', misc: 'その他' },
-  en: { quant: 'Quant', infra: 'Infra', japan: 'Japanese', physics: 'Physics', misc: 'Misc' },
+  ko: {
+    quant: '퀀트',
+    infra: '인프라',
+    japan: '일본어',
+    cfa: 'CFA',
+    physics: '물리학',
+    misc: '기타',
+  },
+  ja: {
+    quant: 'クオンツ',
+    infra: 'インフラ',
+    japan: '日本語',
+    cfa: 'CFA',
+    physics: '物理学',
+    misc: 'その他',
+  },
+  en: {
+    quant: 'Quant',
+    infra: 'Infra',
+    japan: 'Japanese',
+    cfa: 'CFA',
+    physics: 'Physics',
+    misc: 'Misc',
+  },
 }
 
 const CATS_LABEL: Record<Language, { id: string; label: string }[]> = {
@@ -26,6 +48,7 @@ const CATS_LABEL: Record<Language, { id: string; label: string }[]> = {
     { id: 'quant', label: '퀀트' },
     { id: 'infra', label: '인프라' },
     { id: 'japan', label: '일본어' },
+    { id: 'cfa', label: 'CFA' },
     { id: 'physics', label: '물리학' },
   ],
   ja: [
@@ -33,6 +56,7 @@ const CATS_LABEL: Record<Language, { id: string; label: string }[]> = {
     { id: 'quant', label: 'クオンツ' },
     { id: 'infra', label: 'インフラ' },
     { id: 'japan', label: '日本語' },
+    { id: 'cfa', label: 'CFA' },
     { id: 'physics', label: '物理学' },
   ],
   en: [
@@ -40,6 +64,7 @@ const CATS_LABEL: Record<Language, { id: string; label: string }[]> = {
     { id: 'quant', label: 'Quant' },
     { id: 'infra', label: 'Infra' },
     { id: 'japan', label: 'Japanese' },
+    { id: 'cfa', label: 'CFA' },
     { id: 'physics', label: 'Physics' },
   ],
 }
@@ -57,6 +82,8 @@ const homeCopy: Record<
     stratBacktest: string
     japanese: string
     japaneseNote: string
+    cfa: string
+    cfaNote: string
   }
 > = {
   ko: {
@@ -71,6 +98,8 @@ const homeCopy: Record<
     stratBacktest: '전략 백테스트',
     japanese: '일본어',
     japaneseNote: '성적 대기 중 · N2 준비 중',
+    cfa: 'CFA',
+    cfaNote: '2027-02 응시 목표',
   },
   ja: {
     heroDesc:
@@ -84,6 +113,8 @@ const homeCopy: Record<
     stratBacktest: '戦略バックテスト',
     japanese: '日本語',
     japaneseNote: '結果待ち · N2 準備中',
+    cfa: 'CFA',
+    cfaNote: '2027-02 受験予定',
   },
   en: {
     heroDesc:
@@ -97,6 +128,8 @@ const homeCopy: Record<
     stratBacktest: 'Backtests',
     japanese: 'Japanese',
     japaneseNote: 'Result pending · N2 in progress',
+    cfa: 'CFA',
+    cfaNote: 'Level 1 · Feb 2027 sitting',
   },
 }
 
@@ -428,6 +461,7 @@ export default function Home({ posts }: { posts: Post[] }) {
           { k: 'Tags', v: String(tagCount) },
           { k: copy.stratBacktest, v: '12개' },
           { k: copy.japanese, v: 'JLPT N4', sub: copy.japaneseNote },
+          { k: copy.cfa, v: 'Level 1', sub: copy.cfaNote },
         ].map((s, i, a) => (
           <div
             key={s.k}

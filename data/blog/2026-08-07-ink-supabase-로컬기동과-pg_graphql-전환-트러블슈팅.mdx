@@ -1,0 +1,83 @@
+---
+title: '로컬 Supabase가 안 뜨고(analytics unhealthy), pg_graphql로 갈아탈 때 만난 것들'
+date: 2026-08-07
+tags: [Supabase, Docker, pg_graphql, GraphQL, PostgREST, 트러블슈팅]
+project: INK
+---
+
+REST(PostgREST)로 붙여둔 로컬 백엔드를 GraphQL(pg_graphql)로 전환하면서 만난 두 가지.
+
+## 1. `supabase start`가 analytics/vector 컨테이너에서 멈춤
+
+### 문제 상황
+
+```
+supabase_analytics_... container is not ready: unhealthy
+supabase_vector_...    container is not ready: unhealthy
+Stopping containers...
+```
+
+Postgres/REST/Auth는 문제가 없는데 **Logflare(analytics) + vector**가 healthcheck를
+통과 못 해 전체 기동이 롤백됐다. (Apple Silicon/리소스 제한 환경에서 흔함)
+
+### 해결 방법
+
+로컬 개발에 analytics는 필요 없다. `supabase/config.toml`에서 끈다.
+
+```toml
+[analytics]
+enabled = false
+```
+
+`supabase stop` 후 다시 `supabase start` → Postgres·PostgREST·Auth·Studio만 깔끔히 뜬다.
+
+## 2. pg_graphql은 snake_case · Collection · edges/node · BigFloat=문자열
+
+### 문제 상황
+
+과거에 camelCase 필드명을 기대하고 GraphQL 쿼리를 짰다가 전부 실패한 적이 있었다.
+이번엔 **먼저 introspection**으로 실제 스키마를 확인하고 시작했다.
+
+```graphql
+{
+  __type(name: "pieces") {
+    fields {
+      name
+    }
+  }
+} # 실제 노출 이름 확인
+```
+
+확인된 규칙:
+
+- 컬렉션은 `piecesCollection` (테이블명 + `Collection`), **필드는 snake_case**(`title_ko`)
+- Relay 커넥션 구조: `edges { node { ... } }`
+- 정렬 enum: `orderBy: [{ published_at: DescNullsLast }]`
+- FK 관계는 **대상 테이블명**으로 노출(`pieces` 노드 안의 `profiles { display_name }`)
+
+### 함정: `numeric` → `BigFloat`는 입력 시 문자열이어야 한다
+
+SRS의 `ease`(numeric) 컬럼을 업데이트하다 이 에러를 만났다.
+
+```
+"Invalid input for BigFloat type. String required"
+```
+
+pg_graphql은 `numeric`을 **BigFloat**로 노출하는데, **읽을 때는 문자열**로 내려오고
+**쓸 때도 문자열**을 요구한다. 그래서 경계에서 캐스팅해야 한다.
+
+```ts
+// 읽기: 문자열 → 숫자
+ease: Number(node.ease)
+// 쓰기: 숫자 → 문자열
+set: {
+  ease: String(nextEase)
+}
+```
+
+## 배운 점
+
+- 로컬 개발 스택은 **불필요한 컴포넌트(analytics)를 꺼서** 기동 실패를 줄이자.
+- GraphQL 백엔드는 **추측하지 말고 introspection 먼저**. 이름 규칙(Collection/snake_case/관계명)만
+  맞추면 과거의 "전부 실패"가 사라진다.
+- 스칼라 직렬화(특히 `numeric`=BigFloat)는 조용한 지뢰다. **경계에서 타입 캐스팅**을 명시하자.

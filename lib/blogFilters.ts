@@ -28,6 +28,8 @@ const infraTerms = [
 
 const japanTerms = ['japan', 'japanese', 'hiragana', 'katakana', 'nihongo', '일본어', '日本']
 
+const cfaTerms = ['cfa', 'cfa-level-1', 'ethics', 'quantitative-methods', 'financial-reporting']
+
 function searchableText(post) {
   return [post.title, post.summary, post.slug, post.path, ...(post.tags || [])]
     .join(' ')
@@ -52,4 +54,8 @@ export function getInfraPosts() {
 
 export function getJapanPosts() {
   return filterPosts(japanTerms)
+}
+
+export function getCfaPosts() {
+  return filterPosts(cfaTerms)
 }

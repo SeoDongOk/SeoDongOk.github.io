@@ -1,0 +1,65 @@
+---
+title: "직접 시드한 Supabase 유저로 로그인하면 'Database error querying schema'가 뜨는 이유"
+date: 2026-08-07
+tags: [Supabase, GoTrue, Auth, seed, Postgres, 트러블슈팅]
+project: INK
+---
+
+## 문제 상황
+
+로컬 Supabase(Docker)에 개발용 유저를 `seed.sql`로 직접 넣었다. `auth.users`에
+`email`, `encrypted_password = crypt('...', gen_salt('bf'))`, `email_confirmed_at = now()`
+까지 넣었는데도 비밀번호 로그인이 500으로 실패했다.
+
+```
+POST /auth/v1/token?grant_type=password
+{"code":500,"error_code":"unexpected_failure","msg":"Database error querying schema"}
+```
+
+비밀번호도 맞고 `email_confirmed_at`도 채워져 있는데 왜 스키마 조회에서 터질까?
+
+## 원인 분석
+
+`auth.users`에는 `confirmation_token`, `recovery_token`, `email_change`,
+`email_change_token_new`, `phone_change` 같은 **토큰 문자열 컬럼**이 여러 개 있다.
+정상 가입 플로우에서는 GoTrue가 이 컬럼들을 **빈 문자열('')로** 채운다.
+
+그런데 SQL로 직접 insert하면 이 컬럼들이 **NULL**로 남는다. GoTrue(Go)는 이 컬럼들을
+`string`(non-nullable)으로 스캔하는데, NULL을 string으로 변환하려다 실패한다.
+그 결과가 애매한 `Database error querying schema` 500이었다.
+
+확인 쿼리:
+
+```sql
+select confirmation_token is null, recovery_token is null
+from auth.users where email = 'learner@inkb.dev';
+-- t | t  ← NULL이 원인
+```
+
+## 해결 방법
+
+시드 끝에 토큰 컬럼들을 빈 문자열로 교정하면 로그인이 바로 된다.
+
+```sql
+update auth.users set
+  confirmation_token         = coalesce(confirmation_token, ''),
+  recovery_token             = coalesce(recovery_token, ''),
+  email_change               = coalesce(email_change, ''),
+  email_change_token_new     = coalesce(email_change_token_new, ''),
+  email_change_token_current = coalesce(email_change_token_current, ''),
+  phone_change               = coalesce(phone_change, ''),
+  phone_change_token         = coalesce(phone_change_token, ''),
+  reauthentication_token     = coalesce(reauthentication_token, '')
+where email like '%@inkb.dev';
+```
+
+`supabase db reset` 후에도 유지되도록 `seed.sql`에 넣어두는 게 핵심이다.
+
+## 배운 점
+
+- GoTrue의 `auth.users`는 "NULL 허용"처럼 보여도 앱 코드가 non-nullable로 다루는
+  문자열 컬럼이 있다. **직접 시드할 땐 빈 문자열로 채우자.**
+- 500 메시지(`Database error querying schema`)가 모호할 때는 GoTrue 컨테이너 로그보다
+  **해당 유저 행의 NULL 컬럼부터** 의심하는 게 빠르다.
+- 더 깔끔한 대안: 시드에서 SQL insert 대신 `supabase.auth.admin.createUser()`(service_role)로
+  유저를 만들면 이런 컬럼을 GoTrue가 알아서 채운다.

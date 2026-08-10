@@ -1,0 +1,42 @@
+---
+title: '[퀀트 개발 일지] 2026-08-10'
+date: '2026-08-10'
+tags: ['quantitative-trading', 'python', 'binance', 'algorithm', 'daily-log']
+draft: false
+summary: '2026-08-10 — 바이낸스 선물 자동매매 봇 개발 일지'
+---
+
+> 퀀트 개발자를 향한 여정. 매일 한 줄씩.
+
+## 오늘의 커밋
+
+- fix: 익절 비활성 심볼은 봇 내부 고정 TP 청산도 하지 않음
+- feat: 심볼별 USDT 손절 한도 + 익절 비활성 설정
+- fix: 배포 스크립트 누락 모듈 동기화 + 테스트 경로 이식성
+- merge: 파이 실전 튜닝(7/31) 통합 + 테스트 시장데이터 격리
+- feat: 수동 물타기 SL 수량 동기화 + 레버리지 30배 허용
+
+## 변경된 파일
+
+- `backtest/engine.py`
+- `backtesting/backtester.py`
+- `bt_signal_exit.py`
+- `bt_signal_exit2.py`
+- `bt_sweep.py`
+- `config/settings.py`
+- `core/futures_trader.py`
+- `hourly_score.py`
+- `paper_cycle.py`
+- `scripts/deploy_home_restart.sh`
+- `strategies/combination_strategy.py`
+- `tests/test_futures_trader.py`
+- `tests/test_strategies.py`
+- `utils/fear_greed.py`
+
+## 회고
+
+_오늘 배운 것, 막혔던 것, 다음에 할 것을 여기에 기록하세요._
+
+---
+
+_SDO Auto Trader Crypto — Binance Futures 자동매매 봇 개발 중_

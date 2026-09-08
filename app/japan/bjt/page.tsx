@@ -116,6 +116,7 @@ export default function BjtVocabularyPage() {
   const [due, setDue] = useState<number[]>([])
   const [view, setView] = useState<View>('cards')
   const [query, setQuery] = useState('')
+  const [showReading, setShowReading] = useState(true)
 
   useEffect(() => {
     try {
@@ -175,8 +176,8 @@ export default function BjtVocabularyPage() {
         </p>
         <h1 className="text-4xl font-bold tracking-tight">비즈니스 일본어 암기장</h1>
         <p className="mt-4 text-stone-600 dark:text-stone-300">
-          단어를 외우기보다 한자 조합과 업무 문맥을 회상하세요. 현재 1차 핵심 세트 100개를
-          제공합니다.
+          단어를 외우기보다 한자 조합과 업무 문맥을 회상하세요. 현재 1차 핵심 세트 100개를 제공하며,
+          모든 단어에 히라가나 발음을 함께 표시합니다.
         </p>
       </header>
 
@@ -266,6 +267,16 @@ export default function BjtVocabularyPage() {
         </section>
       ) : (
         <>
+          <label className="mb-4 flex items-center gap-2 text-sm text-stone-600 dark:text-stone-300">
+            <input
+              type="checkbox"
+              checked={showReading}
+              onChange={(event) => setShowReading(event.target.checked)}
+              className="h-4 w-4 rounded border-stone-300 text-teal-600"
+            />
+            히라가나 발음 항상 표시
+          </label>
+
           <div className="mb-5 flex flex-wrap gap-2">
             {(['all', 'due', 'known'] as Mode[]).map((value) => (
               <button
@@ -295,7 +306,9 @@ export default function BjtVocabularyPage() {
                 : '복습할 단어가 없습니다'}
             </div>
             <div className="mt-8 text-6xl font-bold tracking-tight">{card.word}</div>
-            <div className="mt-4 text-xl text-teal-600">{revealed ? card.reading : '••••••'}</div>
+            <div className="mt-4 text-xl text-teal-600">
+              {showReading || revealed ? card.reading : '••••••'}
+            </div>
             <div className="mt-3 min-h-8 text-lg">
               {revealed ? card.meaning : '뜻을 생각한 뒤 카드를 눌러 확인하세요'}
             </div>

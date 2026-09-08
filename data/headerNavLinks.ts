@@ -4,6 +4,7 @@ const headerNavLinks = [
   { href: '/quant', title: '퀀트' },
   { href: '/infra', title: '인프라' },
   { href: '/japan', title: '일본어' },
+  { href: '/japan/bjt', title: 'BJT 단어장' },
   { href: '/cfa', title: 'CFA' },
   { href: '/about', title: 'About' },
 ]

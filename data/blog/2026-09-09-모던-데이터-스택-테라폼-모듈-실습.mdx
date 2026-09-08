@@ -1,0 +1,297 @@
+---
+title: '자동매매 봇에서 겪은 문제가 데이터 기반 회사의 과제와 같았다 — Modern Data Stack 학습기'
+date: '2026-09-09'
+tags: ['data-engineering', 'terraform', 'infrastructure', 'docker', 'modern-data-stack']
+draft: false
+summary: '오르타너티브 데이터 분석 회사의 기술블로그를 읽다가, 그들이 겪은 4가지 과제가 내가 자동매매 봇을 운영하며 부딪힌 문제와 구조적으로 같다는 걸 발견했다. Terraform module로 그 해결책을 직접 재현해보며 IaC를 익힌 기록.'
+---
+
+## 남의 과제 목록에서 내 문제를 봤다
+
+Snowflake·dbt·Terraform으로 데이터 기반을 만든 사례를 정리한 글을 읽었다.
+([The Finatext Tech Blog](https://techblog.finatext.com/snowflake-dbt-terraform-15615b020857),
+나우캐스트 大野巧作)
+
+기술 스택이 궁금해서 열었는데, 정작 눈에 들어온 건 도구가 아니라 **"기존 환경의 과제"** 목록이었다.
+
+```
+1. 여러 파이프라인이 AWS 계정 하나에 몰려 리소스·쿼터 경합
+2. 본번(prod) 환경만 존재하는 파이프라인
+3. 강한 권한으로 작업하는 관행
+4. 데이터 카탈로그·리네지 부재
+```
+
+읽으면서 좀 이상한 기분이 들었다. **2번과 4번은 내가 자동매매 봇을 굴리면서 그대로 겪은 것**이었다.
+규모는 비교도 안 되지만 문제의 모양이 같았다.
+
+## 겪어본 문제 두 개
+
+### "본번 환경만 존재한다"
+
+봇을 처음 만들었을 때 실행 모드가 하나였다. 코드를 고치면 그게 곧 실거래였다.
+전략 파라미터 하나 바꾸는 데도 손이 떨렸다.
+
+그래서 `paper` / `live` 모드를 분리했다.
+
+```python
+if settings.is_paper_trading():
+    # 주문을 실제로 내보내지 않고 체결됐다고 가정
+    ...
+```
+
+지금 보니 이게 dev/prod 환경 분리와 같은 동기였다.
+**"안전하게 실험할 곳이 없다"** 는 문제.
+
+### "데이터 카탈로그·리네지가 없다"
+
+거래 기록 2,030건을 분석해서 손실 구조를 파악하려 한 적이 있다.
+정작 시간을 잡아먹은 건 분석이 아니라 **스키마 파악**이었다.
+
+- 이 컬럼이 무슨 의미인지 코드를 거슬러 올라가서 확인
+- 같은 값을 두 군데에 기록하고 있었다는 걸 뒤늦게 발견
+- 결국 전체 1,862건 중 1,680건이 **중복 로깅**이라 통계가 무효였다
+
+테이블이 몇 개 안 되는데도 이랬다.
+데이터소스별로 팀이 나뉘어 있고 구현 방식이 제각각인 조직이라면
+카탈로그가 없을 때 어떻게 되는지 짐작이 갔다.
+
+## 그래서 해결책도 읽어봤다
+
+### ELT — 순서를 바꾼 것
+
+먼저 정리하고 넘어가야 할 개념이 ELT였다.
+
+```
+ETL   추출 → 변환 → 적재     변환을 DWH 밖에서
+ELT   추출 → 적재 → 변환     일단 넣고, DWH 안에서 SQL로 변환
+```
+
+클라우드 DWH가 싸고 빨라지면서 **"먼저 넣고 나중에 변환"** 이 유연해졌다.
+dbt는 이 T(Transformation)를 담당하는 도구다.
+
+### 계산자원과 스토리지 분리
+
+과제 1번(리소스 경합)의 해답이 이거였다.
+
+Athena는 계정 단위 DML 제한이 있어서 파이프라인끼리 서로 경합했다.
+Snowflake는 계산 엔진(Warehouse)과 저장소가 분리돼 있어서,
+팀 A가 무거운 쿼리를 돌려도 팀 B의 Warehouse는 영향을 안 받는다.
+
+**"왜 이 도구인가"가 "어떤 문제를 겪었나"에서 나온다**는 게 인상적이었다.
+도구를 먼저 고르고 문제를 찾은 게 아니었다.
+
+### Terraform module — 리소스가 50개를 넘을 때
+
+가장 실감난 부분. 환경별 Database, 데이터소스별 Schema·Role·Warehouse를 만들다 보니
+리소스가 50개를 넘어갔고, 명명 규칙도 필요해졌다고 한다.
+
+그 해결이 module이었다. 선언에 데이터소스명·환경명만 적으면 전부 생성되는 구조.
+
+## 직접 만들어봤다
+
+읽기만 해서는 안 남을 것 같아서, 같은 구조를 내 봇 데이터 기준으로 재현했다.
+(Terraform은 이번에 처음 설치했다)
+
+### 구조
+
+```
+terraform/
+├── modules/data_bucket/
+│   ├── variables.tf    입력: 데이터소스명, 환경, 보관기간
+│   ├── main.tf         리소스 + 명명 규칙
+│   └── outputs.tf
+└── main.tf             module 호출
+```
+
+### module 안 — 명명 규칙을 한 곳에 가둔다
+
+```hcl
+locals {
+  # 이 한 줄이 전체 리소스의 이름을 결정한다
+  name = "${var.data_source_name}-${var.env}-${random_id.suffix.hex}"
+
+  common_tags = {
+    DataSource  = var.data_source_name
+    Environment = var.env
+    ManagedBy   = "terraform"
+  }
+}
+
+resource "aws_s3_bucket" "this" {
+  bucket = local.name
+  tags   = local.common_tags
+}
+
+# 조건부 생성 — dev는 버전관리 끄고 prod만 켠다
+resource "aws_s3_bucket_versioning" "this" {
+  count  = var.enable_versioning ? 1 : 0
+  bucket = aws_s3_bucket.this.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+```
+
+### 호출부 — 데이터소스 추가가 4줄
+
+```hcl
+module "binance" {
+  source           = "./modules/data_bucket"
+  data_source_name = "binance"
+  env              = var.env
+  retention_days   = 90
+}
+
+module "kiwoom" {
+  source           = "./modules/data_bucket"
+  data_source_name = "kiwoom"
+  env              = var.env
+  retention_days   = 90
+}
+```
+
+`locals.name` 한 줄을 고쳤더니 전체 버킷 이름이 한 번에 바뀌었다.
+**module을 왜 쓰는지가 이 순간에 이해됐다.** 문서를 열 번 읽는 것보다 빨랐다.
+
+### 환경 분리
+
+같은 코드에 값만 바꿔서 dev/prod를 만든다.
+
+```hcl
+# envs/dev.tfvars
+env               = "dev"
+enable_versioning = false   # 개발환경은 불필요
+retention_days    = 7
+
+# envs/prod.tfvars
+env               = "prod"
+enable_versioning = true
+retention_days    = 365
+```
+
+```bash
+terraform apply -var-file=envs/dev.tfvars
+```
+
+봇에서 `paper` / `live`를 나눈 것과 발상이 같다.
+
+## 문법보다 어려운 것
+
+Terraform 문법 자체는 하루면 익혀진다. 진짜는 그 다음이었다.
+
+Terraform은 **세 가지를 일치시키려는 도구**다.
+
+```
+① 코드    "이래야 한다"          main.tf
+② state   "내가 이렇게 만들었다"  terraform.tfstate
+③ 실제    "진짜 이렇다"          AWS
+```
+
+그런데 **①과 ②만 비교해서 실행한다.** ③을 매번 확인하지 않는다.
+사고는 전부 여기서 난다.
+
+| 문제          | 원인                                 |
+| ------------- | ------------------------------------ |
+| drift         | ③을 Terraform 밖에서(콘솔로) 건드림  |
+| 중복 생성     | ②를 잃어버림 → "만든 게 없다"고 판단 |
+| `-/+ replace` | 클라우드 API에 변경 불가 속성이 존재 |
+
+특히 `-/+ replace`가 위험하다.
+S3 버킷 이름, EC2 AMI, RDS 엔진 같은 건 **바꿀 수 없는 속성**이라
+코드에서 고치면 Terraform이 지우고 새로 만든다. DB였으면 데이터가 사라진다.
+
+```
+~ update      제자리 수정 (안전)
+-/+ replace   삭제 후 재생성 (데이터 소멸)
+```
+
+`plan`을 읽는 습관이 왜 강조되는지 알 것 같았다.
+
+### provider 파괴적 변경
+
+실습 중에 바로 부딪힌 것도 있다.
+인터넷 예제를 그대로 복사했더니 에러가 났다.
+
+```hcl
+# AWS provider 3.x — 버킷 안에 인라인
+resource "aws_s3_bucket" "data" {
+  bucket = "..."
+  versioning { enabled = true }   # 4.0부터 안 됨
+}
+
+# 4.0 이후 — 별도 리소스로 분리
+resource "aws_s3_bucket" "data" { bucket = "..." }
+resource "aws_s3_bucket_versioning" "data" { ... }
+```
+
+원문에도 provider 버전업에 파괴적 변경이 포함되는 일이 잦으니
+저장소를 주시하라는 조언이 있었다. 겪고 나니 왜 적어뒀는지 알겠다.
+
+그래서 버전은 고정하는 게 맞다.
+
+```hcl
+required_providers {
+  aws = {
+    source  = "hashicorp/aws"
+    version = "~> 5.0"   # 5.x 안에서만 업데이트
+  }
+}
+```
+
+## 컨테이너화도 같이
+
+봇을 Docker 이미지로 만들었다. 신경 쓴 건 두 가지.
+
+```dockerfile
+# 1. 의존성을 먼저 복사 → 코드만 바뀌면 pip 재설치 안 함
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+
+# 2. 비 root 사용자로 실행
+RUN useradd --create-home trader && chown -R trader:trader /app
+USER trader
+```
+
+그리고 `.dockerignore`에 `.env`를 넣었다.
+**API 키를 이미지에 굽지 않는 것.** 이미지가 유출돼도 키는 안 나간다.
+비밀값은 실행 시점에 주입한다.
+
+```yaml
+services:
+  bot:
+    build: .
+    env_file: [.env] # 런타임 주입
+    volumes: ['./data:/app/data']
+    restart: unless-stopped
+```
+
+`restart: unless-stopped`는 기존에 watchdog으로 하던 걸 대체한다.
+
+## 정리하며
+
+이번에 배운 게 도구 사용법은 아닌 것 같다.
+
+**문제가 먼저 있고 도구는 나중에 온다.**
+Snowflake를 쓴 이유는 리소스 경합을 겪어서였고,
+module을 만든 이유는 리소스가 50개를 넘어서였고,
+dbt를 넣은 이유는 카탈로그가 없어서 곤란했기 때문이다.
+
+내 봇도 마찬가지였다. 실거래에서 손이 떨려서 paper 모드를 만들었고,
+2,030건을 헤매고 나서야 스키마 정리의 필요를 알았다.
+규모만 다르지 순서는 같았다.
+
+남은 숙제도 비슷하다.
+
+- state를 원격으로 옮기고 lock 걸기 (지금은 로컬)
+- 봇의 15분 사이클을 의존관계가 선언된 파이프라인으로 정리하기
+- 데이터 스키마 문서화
+
+실습 코드는 저장소로 남겨뒀다.
+
+---
+
+**참고**
+
+- [Snowflake×dbt×Terraformでモダンなデータ基盤開発してみた](https://techblog.finatext.com/snowflake-dbt-terraform-15615b020857) — The Finatext Tech Blog
+- [Terraform AWS Provider 문서](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)

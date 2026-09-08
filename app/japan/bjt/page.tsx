@@ -106,6 +106,7 @@ const WORDS = [
 ] as const
 
 type Mode = 'all' | 'due' | 'known'
+type View = 'cards' | 'vocabulary'
 
 export default function BjtVocabularyPage() {
   const [index, setIndex] = useState(0)
@@ -113,6 +114,8 @@ export default function BjtVocabularyPage() {
   const [mode, setMode] = useState<Mode>('all')
   const [known, setKnown] = useState<number[]>([])
   const [due, setDue] = useState<number[]>([])
+  const [view, setView] = useState<View>('cards')
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     try {
@@ -129,6 +132,17 @@ export default function BjtVocabularyPage() {
     return [...WORDS]
   }, [mode, known, due])
   const card = pool[index % Math.max(pool.length, 1)] || WORDS[0]
+  const filteredWords = useMemo(() => {
+    const normalized = query.trim().toLowerCase()
+    return WORDS.filter((item) => {
+      if (mode === 'due' && !due.includes(item.id)) return false
+      if (mode === 'known' && !known.includes(item.id)) return false
+      if (!normalized) return true
+      return [item.word, item.reading, item.meaning].some((value) =>
+        value.toLowerCase().includes(normalized)
+      )
+    })
+  }, [query, mode, known, due])
 
   const persist = (nextKnown: number[], nextDue: number[]) => {
     setKnown(nextKnown)
@@ -183,66 +197,139 @@ export default function BjtVocabularyPage() {
         </div>
       </section>
 
-      <div className="mb-5 flex flex-wrap gap-2">
-        {(['all', 'due', 'known'] as Mode[]).map((value) => (
-          <button
-            key={value}
-            onClick={() => {
-              setMode(value)
-              setIndex(0)
-              setRevealed(false)
-            }}
-            className={`rounded-full px-4 py-2 text-sm ${mode === value ? 'bg-stone-900 text-white dark:bg-white dark:text-stone-900' : 'border border-stone-300'}`}
-          >
-            {value === 'all' ? '전체' : value === 'due' ? '다시 보기' : '알고 있음'}
-          </button>
-        ))}
+      <nav
+        className="mb-6 flex rounded-2xl border border-stone-200 p-1 dark:border-stone-700"
+        aria-label="학습 메뉴"
+      >
         <button
-          onClick={reset}
-          className="ml-auto rounded-full px-4 py-2 text-sm text-stone-500 underline"
+          onClick={() => setView('cards')}
+          className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold ${view === 'cards' ? 'bg-teal-600 text-white' : 'text-stone-500'}`}
         >
-          진도 초기화
+          카드 암기
         </button>
-      </div>
+        <button
+          onClick={() => setView('vocabulary')}
+          className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold ${view === 'vocabulary' ? 'bg-teal-600 text-white' : 'text-stone-500'}`}
+        >
+          단어장
+        </button>
+      </nav>
 
-      <section className="min-h-[330px] rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm dark:border-stone-700 dark:bg-stone-900">
-        <div className="text-sm text-stone-500">
-          {pool.length ? `${(index % pool.length) + 1} / ${pool.length}` : '복습할 단어가 없습니다'}
-        </div>
-        <div className="mt-8 text-6xl font-bold tracking-tight">{card.word}</div>
-        <div className="mt-4 text-xl text-teal-600">{revealed ? card.reading : '••••••'}</div>
-        <div className="mt-3 min-h-8 text-lg">
-          {revealed ? card.meaning : '뜻을 생각한 뒤 카드를 눌러 확인하세요'}
-        </div>
-        <button
-          onClick={() => setRevealed((value) => !value)}
-          className="mt-8 rounded-xl bg-teal-600 px-6 py-3 font-semibold text-white hover:bg-teal-700"
-        >
-          {revealed ? '다시 가리기' : '정답 보기'}
-        </button>
-      </section>
+      {view === 'vocabulary' ? (
+        <section>
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="단어·읽기·뜻 검색"
+              className="flex-1 rounded-xl border border-stone-300 bg-transparent px-4 py-3 outline-none focus:border-teal-600"
+            />
+            <div className="flex gap-2 text-sm">
+              {(['all', 'due', 'known'] as Mode[]).map((value) => (
+                <button
+                  key={value}
+                  onClick={() => setMode(value)}
+                  className={`rounded-xl px-3 py-2 ${mode === value ? 'bg-stone-900 text-white dark:bg-white dark:text-stone-900' : 'border border-stone-300'}`}
+                >
+                  {value === 'all' ? '전체' : value === 'due' ? '복습' : '완료'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-stone-200 dark:border-stone-700">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-stone-100 text-stone-500 dark:bg-stone-800">
+                <tr>
+                  <th className="px-4 py-3">단어</th>
+                  <th className="px-4 py-3">읽기</th>
+                  <th className="px-4 py-3">뜻</th>
+                  <th className="px-4 py-3">상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredWords.map((item) => (
+                  <tr key={item.id} className="border-t border-stone-200 dark:border-stone-700">
+                    <td className="px-4 py-3 text-lg font-semibold">{item.word}</td>
+                    <td className="px-4 py-3 text-teal-600">{item.reading}</td>
+                    <td className="px-4 py-3">{item.meaning}</td>
+                    <td className="px-4 py-3 text-xs">
+                      {known.includes(item.id) ? '완료' : due.includes(item.id) ? '복습' : '미학습'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!filteredWords.length && (
+              <p className="p-8 text-center text-stone-500">검색 결과가 없습니다.</p>
+            )}
+          </div>
+        </section>
+      ) : (
+        <>
+          <div className="mb-5 flex flex-wrap gap-2">
+            {(['all', 'due', 'known'] as Mode[]).map((value) => (
+              <button
+                key={value}
+                onClick={() => {
+                  setMode(value)
+                  setIndex(0)
+                  setRevealed(false)
+                }}
+                className={`rounded-full px-4 py-2 text-sm ${mode === value ? 'bg-stone-900 text-white dark:bg-white dark:text-stone-900' : 'border border-stone-300'}`}
+              >
+                {value === 'all' ? '전체' : value === 'due' ? '다시 보기' : '알고 있음'}
+              </button>
+            ))}
+            <button
+              onClick={reset}
+              className="ml-auto rounded-full px-4 py-2 text-sm text-stone-500 underline"
+            >
+              진도 초기화
+            </button>
+          </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <button
-          disabled={!revealed}
-          onClick={() => answer(false)}
-          className="rounded-xl border border-amber-300 px-4 py-3 font-semibold text-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          다시 보기
-        </button>
-        <button
-          disabled={!revealed}
-          onClick={() => answer(true)}
-          className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          알고 있음
-        </button>
-      </div>
+          <section className="min-h-[330px] rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm dark:border-stone-700 dark:bg-stone-900">
+            <div className="text-sm text-stone-500">
+              {pool.length
+                ? `${(index % pool.length) + 1} / ${pool.length}`
+                : '복습할 단어가 없습니다'}
+            </div>
+            <div className="mt-8 text-6xl font-bold tracking-tight">{card.word}</div>
+            <div className="mt-4 text-xl text-teal-600">{revealed ? card.reading : '••••••'}</div>
+            <div className="mt-3 min-h-8 text-lg">
+              {revealed ? card.meaning : '뜻을 생각한 뒤 카드를 눌러 확인하세요'}
+            </div>
+            <button
+              onClick={() => setRevealed((value) => !value)}
+              className="mt-8 rounded-xl bg-teal-600 px-6 py-3 font-semibold text-white hover:bg-teal-700"
+            >
+              {revealed ? '다시 가리기' : '정답 보기'}
+            </button>
+          </section>
 
-      <div className="mt-10 rounded-2xl bg-stone-100 p-5 text-sm text-stone-600 dark:bg-stone-800 dark:text-stone-300">
-        <strong>학습법:</strong> 하루 10개만 진행하고, `期限·締切·納期`처럼 비슷한 단어를 문장
-        속에서 비교하세요. 진도는 이 브라우저에 자동 저장됩니다.
-      </div>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <button
+              disabled={!revealed}
+              onClick={() => answer(false)}
+              className="rounded-xl border border-amber-300 px-4 py-3 font-semibold text-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              다시 보기
+            </button>
+            <button
+              disabled={!revealed}
+              onClick={() => answer(true)}
+              className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              알고 있음
+            </button>
+          </div>
+
+          <div className="mt-10 rounded-2xl bg-stone-100 p-5 text-sm text-stone-600 dark:bg-stone-800 dark:text-stone-300">
+            <strong>학습법:</strong> 하루 10개만 진행하고, `期限·締切·納期`처럼 비슷한 단어를 문장
+            속에서 비교하세요. 진도는 이 브라우저에 자동 저장됩니다.
+          </div>
+        </>
+      )}
     </main>
   )
 }

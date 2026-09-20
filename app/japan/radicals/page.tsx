@@ -1,1147 +1,1138 @@
-"use client";
+'use client'
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from 'react'
 
 const RADICALS = [
   {
     id: 1,
-    radical: "⼀",
-    hint: "One",
+    radical: '⼀',
+    hint: 'One',
   },
   {
     id: 2,
-    radical: "⼁",
-    hint: "Line",
+    radical: '⼁',
+    hint: 'Line',
   },
   {
     id: 3,
-    radical: "⼂",
-    hint: "Dot",
+    radical: '⼂',
+    hint: 'Dot',
   },
   {
     id: 4,
-    radical: "⼃",
-    hint: "Slash",
+    radical: '⼃',
+    hint: 'Slash',
   },
   {
     id: 5,
-    radical: "⼄",
-    hint: "Second",
+    radical: '⼄',
+    hint: 'Second',
   },
   {
     id: 6,
-    radical: "⼅",
-    hint: "Hook",
+    radical: '⼅',
+    hint: 'Hook',
   },
   {
     id: 7,
-    radical: "⼆",
-    hint: "Two",
+    radical: '⼆',
+    hint: 'Two',
   },
   {
     id: 8,
-    radical: "⼇",
-    hint: "Lid",
+    radical: '⼇',
+    hint: 'Lid',
   },
   {
     id: 9,
-    radical: "⼈",
-    hint: "Man",
+    radical: '⼈',
+    hint: 'Man',
   },
   {
     id: 10,
-    radical: "⼉",
-    hint: "Legs",
+    radical: '⼉',
+    hint: 'Legs',
   },
   {
     id: 11,
-    radical: "⼊",
-    hint: "Enter",
+    radical: '⼊',
+    hint: 'Enter',
   },
   {
     id: 12,
-    radical: "⼋",
-    hint: "Eight",
+    radical: '⼋',
+    hint: 'Eight',
   },
   {
     id: 13,
-    radical: "⼌",
-    hint: "Down Box",
+    radical: '⼌',
+    hint: 'Down Box',
   },
   {
     id: 14,
-    radical: "⼍",
-    hint: "Cover",
+    radical: '⼍',
+    hint: 'Cover',
   },
   {
     id: 15,
-    radical: "⼎",
-    hint: "Ice",
+    radical: '⼎',
+    hint: 'Ice',
   },
   {
     id: 16,
-    radical: "⼏",
-    hint: "Table",
+    radical: '⼏',
+    hint: 'Table',
   },
   {
     id: 17,
-    radical: "⼐",
-    hint: "Open Box",
+    radical: '⼐',
+    hint: 'Open Box',
   },
   {
     id: 18,
-    radical: "⼑",
-    hint: "Knife",
+    radical: '⼑',
+    hint: 'Knife',
   },
   {
     id: 19,
-    radical: "⼒",
-    hint: "Power",
+    radical: '⼒',
+    hint: 'Power',
   },
   {
     id: 20,
-    radical: "⼓",
-    hint: "Wrap",
+    radical: '⼓',
+    hint: 'Wrap',
   },
   {
     id: 21,
-    radical: "⼔",
-    hint: "Spoon",
+    radical: '⼔',
+    hint: 'Spoon',
   },
   {
     id: 22,
-    radical: "⼕",
-    hint: "Right Open Box",
+    radical: '⼕',
+    hint: 'Right Open Box',
   },
   {
     id: 23,
-    radical: "⼖",
-    hint: "Hiding Enclosure",
+    radical: '⼖',
+    hint: 'Hiding Enclosure',
   },
   {
     id: 24,
-    radical: "⼗",
-    hint: "Ten",
+    radical: '⼗',
+    hint: 'Ten',
   },
   {
     id: 25,
-    radical: "⼘",
-    hint: "Divination",
+    radical: '⼘',
+    hint: 'Divination',
   },
   {
     id: 26,
-    radical: "⼙",
-    hint: "Seal",
+    radical: '⼙',
+    hint: 'Seal',
   },
   {
     id: 27,
-    radical: "⼚",
-    hint: "Cliff",
+    radical: '⼚',
+    hint: 'Cliff',
   },
   {
     id: 28,
-    radical: "⼛",
-    hint: "Private",
+    radical: '⼛',
+    hint: 'Private',
   },
   {
     id: 29,
-    radical: "⼜",
-    hint: "Again",
+    radical: '⼜',
+    hint: 'Again',
   },
   {
     id: 30,
-    radical: "⼝",
-    hint: "Mouth",
+    radical: '⼝',
+    hint: 'Mouth',
   },
   {
     id: 31,
-    radical: "⼞",
-    hint: "Enclosure",
+    radical: '⼞',
+    hint: 'Enclosure',
   },
   {
     id: 32,
-    radical: "⼟",
-    hint: "Earth",
+    radical: '⼟',
+    hint: 'Earth',
   },
   {
     id: 33,
-    radical: "⼠",
-    hint: "Scholar",
+    radical: '⼠',
+    hint: 'Scholar',
   },
   {
     id: 34,
-    radical: "⼡",
-    hint: "Go",
+    radical: '⼡',
+    hint: 'Go',
   },
   {
     id: 35,
-    radical: "⼢",
-    hint: "Go Slowly",
+    radical: '⼢',
+    hint: 'Go Slowly',
   },
   {
     id: 36,
-    radical: "⼣",
-    hint: "Evening",
+    radical: '⼣',
+    hint: 'Evening',
   },
   {
     id: 37,
-    radical: "⼤",
-    hint: "Big",
+    radical: '⼤',
+    hint: 'Big',
   },
   {
     id: 38,
-    radical: "⼥",
-    hint: "Woman",
+    radical: '⼥',
+    hint: 'Woman',
   },
   {
     id: 39,
-    radical: "⼦",
-    hint: "Child",
+    radical: '⼦',
+    hint: 'Child',
   },
   {
     id: 40,
-    radical: "⼧",
-    hint: "Roof",
+    radical: '⼧',
+    hint: 'Roof',
   },
   {
     id: 41,
-    radical: "⼨",
-    hint: "Inch",
+    radical: '⼨',
+    hint: 'Inch',
   },
   {
     id: 42,
-    radical: "⼩",
-    hint: "Small",
+    radical: '⼩',
+    hint: 'Small',
   },
   {
     id: 43,
-    radical: "⼪",
-    hint: "Lame",
+    radical: '⼪',
+    hint: 'Lame',
   },
   {
     id: 44,
-    radical: "⼫",
-    hint: "Corpse",
+    radical: '⼫',
+    hint: 'Corpse',
   },
   {
     id: 45,
-    radical: "⼬",
-    hint: "Sprout",
+    radical: '⼬',
+    hint: 'Sprout',
   },
   {
     id: 46,
-    radical: "⼭",
-    hint: "Mountain",
+    radical: '⼭',
+    hint: 'Mountain',
   },
   {
     id: 47,
-    radical: "⼮",
-    hint: "River",
+    radical: '⼮',
+    hint: 'River',
   },
   {
     id: 48,
-    radical: "⼯",
-    hint: "Work",
+    radical: '⼯',
+    hint: 'Work',
   },
   {
     id: 49,
-    radical: "⼰",
-    hint: "Oneself",
+    radical: '⼰',
+    hint: 'Oneself',
   },
   {
     id: 50,
-    radical: "⼱",
-    hint: "Turban",
+    radical: '⼱',
+    hint: 'Turban',
   },
   {
     id: 51,
-    radical: "⼲",
-    hint: "Dry",
+    radical: '⼲',
+    hint: 'Dry',
   },
   {
     id: 52,
-    radical: "⼳",
-    hint: "Short Thread",
+    radical: '⼳',
+    hint: 'Short Thread',
   },
   {
     id: 53,
-    radical: "⼴",
-    hint: "Dotted Cliff",
+    radical: '⼴',
+    hint: 'Dotted Cliff',
   },
   {
     id: 54,
-    radical: "⼵",
-    hint: "Long Stride",
+    radical: '⼵',
+    hint: 'Long Stride',
   },
   {
     id: 55,
-    radical: "⼶",
-    hint: "Two Hands",
+    radical: '⼶',
+    hint: 'Two Hands',
   },
   {
     id: 56,
-    radical: "⼷",
-    hint: "Shoot",
+    radical: '⼷',
+    hint: 'Shoot',
   },
   {
     id: 57,
-    radical: "⼸",
-    hint: "Bow",
+    radical: '⼸',
+    hint: 'Bow',
   },
   {
     id: 58,
-    radical: "⼹",
-    hint: "Snout",
+    radical: '⼹',
+    hint: 'Snout',
   },
   {
     id: 59,
-    radical: "⼺",
-    hint: "Bristle",
+    radical: '⼺',
+    hint: 'Bristle',
   },
   {
     id: 60,
-    radical: "⼻",
-    hint: "Step",
+    radical: '⼻',
+    hint: 'Step',
   },
   {
     id: 61,
-    radical: "⼼",
-    hint: "Heart",
+    radical: '⼼',
+    hint: 'Heart',
   },
   {
     id: 62,
-    radical: "⼽",
-    hint: "Halberd",
+    radical: '⼽',
+    hint: 'Halberd',
   },
   {
     id: 63,
-    radical: "⼾",
-    hint: "Door",
+    radical: '⼾',
+    hint: 'Door',
   },
   {
     id: 64,
-    radical: "⼿",
-    hint: "Hand",
+    radical: '⼿',
+    hint: 'Hand',
   },
   {
     id: 65,
-    radical: "⽀",
-    hint: "Branch",
+    radical: '⽀',
+    hint: 'Branch',
   },
   {
     id: 66,
-    radical: "⽁",
-    hint: "Rap",
+    radical: '⽁',
+    hint: 'Rap',
   },
   {
     id: 67,
-    radical: "⽂",
-    hint: "Script",
+    radical: '⽂',
+    hint: 'Script',
   },
   {
     id: 68,
-    radical: "⽃",
-    hint: "Dipper",
+    radical: '⽃',
+    hint: 'Dipper',
   },
   {
     id: 69,
-    radical: "⽄",
-    hint: "Axe",
+    radical: '⽄',
+    hint: 'Axe',
   },
   {
     id: 70,
-    radical: "⽅",
-    hint: "Square",
+    radical: '⽅',
+    hint: 'Square',
   },
   {
     id: 71,
-    radical: "⽆",
-    hint: "Not",
+    radical: '⽆',
+    hint: 'Not',
   },
   {
     id: 72,
-    radical: "⽇",
-    hint: "Sun",
+    radical: '⽇',
+    hint: 'Sun',
   },
   {
     id: 73,
-    radical: "⽈",
-    hint: "Say",
+    radical: '⽈',
+    hint: 'Say',
   },
   {
     id: 74,
-    radical: "⽉",
-    hint: "Moon",
+    radical: '⽉',
+    hint: 'Moon',
   },
   {
     id: 75,
-    radical: "⽊",
-    hint: "Tree",
+    radical: '⽊',
+    hint: 'Tree',
   },
   {
     id: 76,
-    radical: "⽋",
-    hint: "Lack",
+    radical: '⽋',
+    hint: 'Lack',
   },
   {
     id: 77,
-    radical: "⽌",
-    hint: "Stop",
+    radical: '⽌',
+    hint: 'Stop',
   },
   {
     id: 78,
-    radical: "⽍",
-    hint: "Death",
+    radical: '⽍',
+    hint: 'Death',
   },
   {
     id: 79,
-    radical: "⽎",
-    hint: "Weapon",
+    radical: '⽎',
+    hint: 'Weapon',
   },
   {
     id: 80,
-    radical: "⽏",
-    hint: "Do Not",
+    radical: '⽏',
+    hint: 'Do Not',
   },
   {
     id: 81,
-    radical: "⽐",
-    hint: "Compare",
+    radical: '⽐',
+    hint: 'Compare',
   },
   {
     id: 82,
-    radical: "⽑",
-    hint: "Fur",
+    radical: '⽑',
+    hint: 'Fur',
   },
   {
     id: 83,
-    radical: "⽒",
-    hint: "Clan",
+    radical: '⽒',
+    hint: 'Clan',
   },
   {
     id: 84,
-    radical: "⽓",
-    hint: "Steam",
+    radical: '⽓',
+    hint: 'Steam',
   },
   {
     id: 85,
-    radical: "⽔",
-    hint: "Water",
+    radical: '⽔',
+    hint: 'Water',
   },
   {
     id: 86,
-    radical: "⽕",
-    hint: "Fire",
+    radical: '⽕',
+    hint: 'Fire',
   },
   {
     id: 87,
-    radical: "⽖",
-    hint: "Claw",
+    radical: '⽖',
+    hint: 'Claw',
   },
   {
     id: 88,
-    radical: "⽗",
-    hint: "Father",
+    radical: '⽗',
+    hint: 'Father',
   },
   {
     id: 89,
-    radical: "⽘",
-    hint: "Double X",
+    radical: '⽘',
+    hint: 'Double X',
   },
   {
     id: 90,
-    radical: "⽙",
-    hint: "Half Tree Trunk",
+    radical: '⽙',
+    hint: 'Half Tree Trunk',
   },
   {
     id: 91,
-    radical: "⽚",
-    hint: "Slice",
+    radical: '⽚',
+    hint: 'Slice',
   },
   {
     id: 92,
-    radical: "⽛",
-    hint: "Fang",
+    radical: '⽛',
+    hint: 'Fang',
   },
   {
     id: 93,
-    radical: "⽜",
-    hint: "Cow",
+    radical: '⽜',
+    hint: 'Cow',
   },
   {
     id: 94,
-    radical: "⽝",
-    hint: "Dog",
+    radical: '⽝',
+    hint: 'Dog',
   },
   {
     id: 95,
-    radical: "⽞",
-    hint: "Profound",
+    radical: '⽞',
+    hint: 'Profound',
   },
   {
     id: 96,
-    radical: "⽟",
-    hint: "Jade",
+    radical: '⽟',
+    hint: 'Jade',
   },
   {
     id: 97,
-    radical: "⽠",
-    hint: "Melon",
+    radical: '⽠',
+    hint: 'Melon',
   },
   {
     id: 98,
-    radical: "⽡",
-    hint: "Tile",
+    radical: '⽡',
+    hint: 'Tile',
   },
   {
     id: 99,
-    radical: "⽢",
-    hint: "Sweet",
+    radical: '⽢',
+    hint: 'Sweet',
   },
   {
     id: 100,
-    radical: "⽣",
-    hint: "Life",
+    radical: '⽣',
+    hint: 'Life',
   },
   {
     id: 101,
-    radical: "⽤",
-    hint: "Use",
+    radical: '⽤',
+    hint: 'Use',
   },
   {
     id: 102,
-    radical: "⽥",
-    hint: "Field",
+    radical: '⽥',
+    hint: 'Field',
   },
   {
     id: 103,
-    radical: "⽦",
-    hint: "Bolt Of Cloth",
+    radical: '⽦',
+    hint: 'Bolt Of Cloth',
   },
   {
     id: 104,
-    radical: "⽧",
-    hint: "Sickness",
+    radical: '⽧',
+    hint: 'Sickness',
   },
   {
     id: 105,
-    radical: "⽨",
-    hint: "Dotted Tent",
+    radical: '⽨',
+    hint: 'Dotted Tent',
   },
   {
     id: 106,
-    radical: "⽩",
-    hint: "White",
+    radical: '⽩',
+    hint: 'White',
   },
   {
     id: 107,
-    radical: "⽪",
-    hint: "Skin",
+    radical: '⽪',
+    hint: 'Skin',
   },
   {
     id: 108,
-    radical: "⽫",
-    hint: "Dish",
+    radical: '⽫',
+    hint: 'Dish',
   },
   {
     id: 109,
-    radical: "⽬",
-    hint: "Eye",
+    radical: '⽬',
+    hint: 'Eye',
   },
   {
     id: 110,
-    radical: "⽭",
-    hint: "Spear",
+    radical: '⽭',
+    hint: 'Spear',
   },
   {
     id: 111,
-    radical: "⽮",
-    hint: "Arrow",
+    radical: '⽮',
+    hint: 'Arrow',
   },
   {
     id: 112,
-    radical: "⽯",
-    hint: "Stone",
+    radical: '⽯',
+    hint: 'Stone',
   },
   {
     id: 113,
-    radical: "⽰",
-    hint: "Spirit",
+    radical: '⽰',
+    hint: 'Spirit',
   },
   {
     id: 114,
-    radical: "⽱",
-    hint: "Track",
+    radical: '⽱',
+    hint: 'Track',
   },
   {
     id: 115,
-    radical: "⽲",
-    hint: "Grain",
+    radical: '⽲',
+    hint: 'Grain',
   },
   {
     id: 116,
-    radical: "⽳",
-    hint: "Cave",
+    radical: '⽳',
+    hint: 'Cave',
   },
   {
     id: 117,
-    radical: "⽴",
-    hint: "Stand",
+    radical: '⽴',
+    hint: 'Stand',
   },
   {
     id: 118,
-    radical: "⽵",
-    hint: "Bamboo",
+    radical: '⽵',
+    hint: 'Bamboo',
   },
   {
     id: 119,
-    radical: "⽶",
-    hint: "Rice",
+    radical: '⽶',
+    hint: 'Rice',
   },
   {
     id: 120,
-    radical: "⽷",
-    hint: "Silk",
+    radical: '⽷',
+    hint: 'Silk',
   },
   {
     id: 121,
-    radical: "⽸",
-    hint: "Jar",
+    radical: '⽸',
+    hint: 'Jar',
   },
   {
     id: 122,
-    radical: "⽹",
-    hint: "Net",
+    radical: '⽹',
+    hint: 'Net',
   },
   {
     id: 123,
-    radical: "⽺",
-    hint: "Sheep",
+    radical: '⽺',
+    hint: 'Sheep',
   },
   {
     id: 124,
-    radical: "⽻",
-    hint: "Feather",
+    radical: '⽻',
+    hint: 'Feather',
   },
   {
     id: 125,
-    radical: "⽼",
-    hint: "Old",
+    radical: '⽼',
+    hint: 'Old',
   },
   {
     id: 126,
-    radical: "⽽",
-    hint: "And",
+    radical: '⽽',
+    hint: 'And',
   },
   {
     id: 127,
-    radical: "⽾",
-    hint: "Plow",
+    radical: '⽾',
+    hint: 'Plow',
   },
   {
     id: 128,
-    radical: "⽿",
-    hint: "Ear",
+    radical: '⽿',
+    hint: 'Ear',
   },
   {
     id: 129,
-    radical: "⾀",
-    hint: "Brush",
+    radical: '⾀',
+    hint: 'Brush',
   },
   {
     id: 130,
-    radical: "⾁",
-    hint: "Meat",
+    radical: '⾁',
+    hint: 'Meat',
   },
   {
     id: 131,
-    radical: "⾂",
-    hint: "Minister",
+    radical: '⾂',
+    hint: 'Minister',
   },
   {
     id: 132,
-    radical: "⾃",
-    hint: "Self",
+    radical: '⾃',
+    hint: 'Self',
   },
   {
     id: 133,
-    radical: "⾄",
-    hint: "Arrive",
+    radical: '⾄',
+    hint: 'Arrive',
   },
   {
     id: 134,
-    radical: "⾅",
-    hint: "Mortar",
+    radical: '⾅',
+    hint: 'Mortar',
   },
   {
     id: 135,
-    radical: "⾆",
-    hint: "Tongue",
+    radical: '⾆',
+    hint: 'Tongue',
   },
   {
     id: 136,
-    radical: "⾇",
-    hint: "Oppose",
+    radical: '⾇',
+    hint: 'Oppose',
   },
   {
     id: 137,
-    radical: "⾈",
-    hint: "Boat",
+    radical: '⾈',
+    hint: 'Boat',
   },
   {
     id: 138,
-    radical: "⾉",
-    hint: "Stopping",
+    radical: '⾉',
+    hint: 'Stopping',
   },
   {
     id: 139,
-    radical: "⾊",
-    hint: "Color",
+    radical: '⾊',
+    hint: 'Color',
   },
   {
     id: 140,
-    radical: "⾋",
-    hint: "Grass",
+    radical: '⾋',
+    hint: 'Grass',
   },
   {
     id: 141,
-    radical: "⾌",
-    hint: "Tiger",
+    radical: '⾌',
+    hint: 'Tiger',
   },
   {
     id: 142,
-    radical: "⾍",
-    hint: "Insect",
+    radical: '⾍',
+    hint: 'Insect',
   },
   {
     id: 143,
-    radical: "⾎",
-    hint: "Blood",
+    radical: '⾎',
+    hint: 'Blood',
   },
   {
     id: 144,
-    radical: "⾏",
-    hint: "Walk Enclosure",
+    radical: '⾏',
+    hint: 'Walk Enclosure',
   },
   {
     id: 145,
-    radical: "⾐",
-    hint: "Clothes",
+    radical: '⾐',
+    hint: 'Clothes',
   },
   {
     id: 146,
-    radical: "⾑",
-    hint: "West",
+    radical: '⾑',
+    hint: 'West',
   },
   {
     id: 147,
-    radical: "⾒",
-    hint: "See",
+    radical: '⾒',
+    hint: 'See',
   },
   {
     id: 148,
-    radical: "⾓",
-    hint: "Horn",
+    radical: '⾓',
+    hint: 'Horn',
   },
   {
     id: 149,
-    radical: "⾔",
-    hint: "Speech",
+    radical: '⾔',
+    hint: 'Speech',
   },
   {
     id: 150,
-    radical: "⾕",
-    hint: "Valley",
+    radical: '⾕',
+    hint: 'Valley',
   },
   {
     id: 151,
-    radical: "⾖",
-    hint: "Bean",
+    radical: '⾖',
+    hint: 'Bean',
   },
   {
     id: 152,
-    radical: "⾗",
-    hint: "Pig",
+    radical: '⾗',
+    hint: 'Pig',
   },
   {
     id: 153,
-    radical: "⾘",
-    hint: "Badger",
+    radical: '⾘',
+    hint: 'Badger',
   },
   {
     id: 154,
-    radical: "⾙",
-    hint: "Shell",
+    radical: '⾙',
+    hint: 'Shell',
   },
   {
     id: 155,
-    radical: "⾚",
-    hint: "Red",
+    radical: '⾚',
+    hint: 'Red',
   },
   {
     id: 156,
-    radical: "⾛",
-    hint: "Run",
+    radical: '⾛',
+    hint: 'Run',
   },
   {
     id: 157,
-    radical: "⾜",
-    hint: "Foot",
+    radical: '⾜',
+    hint: 'Foot',
   },
   {
     id: 158,
-    radical: "⾝",
-    hint: "Body",
+    radical: '⾝',
+    hint: 'Body',
   },
   {
     id: 159,
-    radical: "⾞",
-    hint: "Cart",
+    radical: '⾞',
+    hint: 'Cart',
   },
   {
     id: 160,
-    radical: "⾟",
-    hint: "Bitter",
+    radical: '⾟',
+    hint: 'Bitter',
   },
   {
     id: 161,
-    radical: "⾠",
-    hint: "Morning",
+    radical: '⾠',
+    hint: 'Morning',
   },
   {
     id: 162,
-    radical: "⾡",
-    hint: "Walk",
+    radical: '⾡',
+    hint: 'Walk',
   },
   {
     id: 163,
-    radical: "⾢",
-    hint: "City",
+    radical: '⾢',
+    hint: 'City',
   },
   {
     id: 164,
-    radical: "⾣",
-    hint: "Wine",
+    radical: '⾣',
+    hint: 'Wine',
   },
   {
     id: 165,
-    radical: "⾤",
-    hint: "Distinguish",
+    radical: '⾤',
+    hint: 'Distinguish',
   },
   {
     id: 166,
-    radical: "⾥",
-    hint: "Village",
+    radical: '⾥',
+    hint: 'Village',
   },
   {
     id: 167,
-    radical: "⾦",
-    hint: "Gold",
+    radical: '⾦',
+    hint: 'Gold',
   },
   {
     id: 168,
-    radical: "⾧",
-    hint: "Long",
+    radical: '⾧',
+    hint: 'Long',
   },
   {
     id: 169,
-    radical: "⾨",
-    hint: "Gate",
+    radical: '⾨',
+    hint: 'Gate',
   },
   {
     id: 170,
-    radical: "⾩",
-    hint: "Mound",
+    radical: '⾩',
+    hint: 'Mound',
   },
   {
     id: 171,
-    radical: "⾪",
-    hint: "Slave",
+    radical: '⾪',
+    hint: 'Slave',
   },
   {
     id: 172,
-    radical: "⾫",
-    hint: "Short Tailed Bird",
+    radical: '⾫',
+    hint: 'Short Tailed Bird',
   },
   {
     id: 173,
-    radical: "⾬",
-    hint: "Rain",
+    radical: '⾬',
+    hint: 'Rain',
   },
   {
     id: 174,
-    radical: "⾭",
-    hint: "Blue",
+    radical: '⾭',
+    hint: 'Blue',
   },
   {
     id: 175,
-    radical: "⾮",
-    hint: "Wrong",
+    radical: '⾮',
+    hint: 'Wrong',
   },
   {
     id: 176,
-    radical: "⾯",
-    hint: "Face",
+    radical: '⾯',
+    hint: 'Face',
   },
   {
     id: 177,
-    radical: "⾰",
-    hint: "Leather",
+    radical: '⾰',
+    hint: 'Leather',
   },
   {
     id: 178,
-    radical: "⾱",
-    hint: "Tanned Leather",
+    radical: '⾱',
+    hint: 'Tanned Leather',
   },
   {
     id: 179,
-    radical: "⾲",
-    hint: "Leek",
+    radical: '⾲',
+    hint: 'Leek',
   },
   {
     id: 180,
-    radical: "⾳",
-    hint: "Sound",
+    radical: '⾳',
+    hint: 'Sound',
   },
   {
     id: 181,
-    radical: "⾴",
-    hint: "Leaf",
+    radical: '⾴',
+    hint: 'Leaf',
   },
   {
     id: 182,
-    radical: "⾵",
-    hint: "Wind",
+    radical: '⾵',
+    hint: 'Wind',
   },
   {
     id: 183,
-    radical: "⾶",
-    hint: "Fly",
+    radical: '⾶',
+    hint: 'Fly',
   },
   {
     id: 184,
-    radical: "⾷",
-    hint: "Eat",
+    radical: '⾷',
+    hint: 'Eat',
   },
   {
     id: 185,
-    radical: "⾸",
-    hint: "Head",
+    radical: '⾸',
+    hint: 'Head',
   },
   {
     id: 186,
-    radical: "⾹",
-    hint: "Fragrant",
+    radical: '⾹',
+    hint: 'Fragrant',
   },
   {
     id: 187,
-    radical: "⾺",
-    hint: "Horse",
+    radical: '⾺',
+    hint: 'Horse',
   },
   {
     id: 188,
-    radical: "⾻",
-    hint: "Bone",
+    radical: '⾻',
+    hint: 'Bone',
   },
   {
     id: 189,
-    radical: "⾼",
-    hint: "Tall",
+    radical: '⾼',
+    hint: 'Tall',
   },
   {
     id: 190,
-    radical: "⾽",
-    hint: "Hair",
+    radical: '⾽',
+    hint: 'Hair',
   },
   {
     id: 191,
-    radical: "⾾",
-    hint: "Fight",
+    radical: '⾾',
+    hint: 'Fight',
   },
   {
     id: 192,
-    radical: "⾿",
-    hint: "Sacrificial Wine",
+    radical: '⾿',
+    hint: 'Sacrificial Wine',
   },
   {
     id: 193,
-    radical: "⿀",
-    hint: "Cauldron",
+    radical: '⿀',
+    hint: 'Cauldron',
   },
   {
     id: 194,
-    radical: "⿁",
-    hint: "Ghost",
+    radical: '⿁',
+    hint: 'Ghost',
   },
   {
     id: 195,
-    radical: "⿂",
-    hint: "Fish",
+    radical: '⿂',
+    hint: 'Fish',
   },
   {
     id: 196,
-    radical: "⿃",
-    hint: "Bird",
+    radical: '⿃',
+    hint: 'Bird',
   },
   {
     id: 197,
-    radical: "⿄",
-    hint: "Salt",
+    radical: '⿄',
+    hint: 'Salt',
   },
   {
     id: 198,
-    radical: "⿅",
-    hint: "Deer",
+    radical: '⿅',
+    hint: 'Deer',
   },
   {
     id: 199,
-    radical: "⿆",
-    hint: "Wheat",
+    radical: '⿆',
+    hint: 'Wheat',
   },
   {
     id: 200,
-    radical: "⿇",
-    hint: "Hemp",
+    radical: '⿇',
+    hint: 'Hemp',
   },
   {
     id: 201,
-    radical: "⿈",
-    hint: "Yellow",
+    radical: '⿈',
+    hint: 'Yellow',
   },
   {
     id: 202,
-    radical: "⿉",
-    hint: "Millet",
+    radical: '⿉',
+    hint: 'Millet',
   },
   {
     id: 203,
-    radical: "⿊",
-    hint: "Black",
+    radical: '⿊',
+    hint: 'Black',
   },
   {
     id: 204,
-    radical: "⿋",
-    hint: "Embroidery",
+    radical: '⿋',
+    hint: 'Embroidery',
   },
   {
     id: 205,
-    radical: "⿌",
-    hint: "Frog",
+    radical: '⿌',
+    hint: 'Frog',
   },
   {
     id: 206,
-    radical: "⿍",
-    hint: "Tripod",
+    radical: '⿍',
+    hint: 'Tripod',
   },
   {
     id: 207,
-    radical: "⿎",
-    hint: "Drum",
+    radical: '⿎',
+    hint: 'Drum',
   },
   {
     id: 208,
-    radical: "⿏",
-    hint: "Rat",
+    radical: '⿏',
+    hint: 'Rat',
   },
   {
     id: 209,
-    radical: "⿐",
-    hint: "Nose",
+    radical: '⿐',
+    hint: 'Nose',
   },
   {
     id: 210,
-    radical: "⿑",
-    hint: "Even",
+    radical: '⿑',
+    hint: 'Even',
   },
   {
     id: 211,
-    radical: "⿒",
-    hint: "Tooth",
+    radical: '⿒',
+    hint: 'Tooth',
   },
   {
     id: 212,
-    radical: "⿓",
-    hint: "Dragon",
+    radical: '⿓',
+    hint: 'Dragon',
   },
   {
     id: 213,
-    radical: "⿔",
-    hint: "Turtle",
+    radical: '⿔',
+    hint: 'Turtle',
   },
   {
     id: 214,
-    radical: "⿕",
-    hint: "Flute",
+    radical: '⿕',
+    hint: 'Flute',
   },
-] as const;
+] as const
 
-type Mode = "all" | "due" | "known";
+type Mode = 'all' | 'due' | 'known'
 
 export default function RadicalFlashcardsPage() {
-  const [index, setIndex] = useState(0);
-  const [revealed, setRevealed] = useState(false);
-  const [mode, setMode] = useState<Mode>("all");
-  const [known, setKnown] = useState<number[]>([]);
-  const [due, setDue] = useState<number[]>([]);
-  const [query, setQuery] = useState("");
+  const [index, setIndex] = useState(0)
+  const [revealed, setRevealed] = useState(false)
+  const [mode, setMode] = useState<Mode>('all')
+  const [known, setKnown] = useState<number[]>([])
+  const [due, setDue] = useState<number[]>([])
+  const [query, setQuery] = useState('')
   useEffect(() => {
     try {
-      setKnown(JSON.parse(localStorage.getItem("radicals-known") || "[]"));
-      setDue(JSON.parse(localStorage.getItem("radicals-due") || "[]"));
+      setKnown(JSON.parse(localStorage.getItem('radicals-known') || '[]'))
+      setDue(JSON.parse(localStorage.getItem('radicals-due') || '[]'))
     } catch {
-      console.warn("부수 학습 진도를 불러오지 못했습니다.");
+      console.warn('부수 학습 진도를 불러오지 못했습니다.')
     }
-  }, []);
+  }, [])
   const pool = useMemo(
     () =>
-      mode === "known"
+      mode === 'known'
         ? RADICALS.filter((x) => known.includes(x.id))
-        : mode === "due"
+        : mode === 'due'
           ? RADICALS.filter((x) => due.includes(x.id))
           : [...RADICALS],
-    [mode, known, due],
-  );
-  const card = pool[index % Math.max(pool.length, 1)] || RADICALS[0];
+    [mode, known, due]
+  )
+  const card = pool[index % Math.max(pool.length, 1)] || RADICALS[0]
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return RADICALS.filter(
-      (x) => !q || `${x.id} ${x.radical} ${x.hint}`.toLowerCase().includes(q),
-    );
-  }, [query]);
+    const q = query.trim().toLowerCase()
+    return RADICALS.filter((x) => !q || `${x.id} ${x.radical} ${x.hint}`.toLowerCase().includes(q))
+  }, [query])
   const persist = (k: number[], d: number[]) => {
-    setKnown(k);
-    setDue(d);
-    localStorage.setItem("radicals-known", JSON.stringify(k));
-    localStorage.setItem("radicals-due", JSON.stringify(d));
-  };
+    setKnown(k)
+    setDue(d)
+    localStorage.setItem('radicals-known', JSON.stringify(k))
+    localStorage.setItem('radicals-due', JSON.stringify(d))
+  }
   const answer = (ok: boolean) => {
-    const k = ok
-      ? Array.from(new Set([...known, card.id]))
-      : known.filter((id) => id !== card.id);
-    const d = ok
-      ? due.filter((id) => id !== card.id)
-      : Array.from(new Set([...due, card.id]));
-    persist(k, d);
-    setRevealed(false);
-    setIndex((i) => i + 1);
-  };
+    const k = ok ? Array.from(new Set([...known, card.id])) : known.filter((id) => id !== card.id)
+    const d = ok ? due.filter((id) => id !== card.id) : Array.from(new Set([...due, card.id]))
+    persist(k, d)
+    setRevealed(false)
+    setIndex((i) => i + 1)
+  }
   const reset = () => {
-    persist([], []);
-    setIndex(0);
-    setRevealed(false);
-  };
+    persist([], [])
+    setIndex(0)
+    setRevealed(false)
+  }
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
       <header className="mb-8">
         <p className="mb-3 text-sm font-semibold tracking-[0.2em] text-teal-600 uppercase">
           Japanese Kanji Radical Flashcards
         </p>
-        <h1 className="text-4xl font-bold tracking-tight">
-          한자 부수 플래시카드
-        </h1>
+        <h1 className="text-4xl font-bold tracking-tight">한자 부수 플래시카드</h1>
         <p className="mt-4 text-stone-600 dark:text-stone-300">
-          부수만 보고 의미 힌트를 떠올린 뒤 정답을 확인하세요. 진도는 이
-          브라우저에 저장됩니다.
+          부수만 보고 의미 힌트를 떠올린 뒤 정답을 확인하세요. 진도는 이 브라우저에 저장됩니다.
         </p>
       </header>
       <section className="mb-6 grid grid-cols-3 gap-3 text-center">
@@ -1159,17 +1150,17 @@ export default function RadicalFlashcardsPage() {
         </div>
       </section>
       <div className="mb-5 flex flex-wrap gap-2">
-        {(["all", "due", "known"] as Mode[]).map((v) => (
+        {(['all', 'due', 'known'] as Mode[]).map((v) => (
           <button
             key={v}
             onClick={() => {
-              setMode(v);
-              setIndex(0);
-              setRevealed(false);
+              setMode(v)
+              setIndex(0)
+              setRevealed(false)
             }}
-            className={`rounded-full px-4 py-2 text-sm ${mode === v ? "bg-stone-900 text-white" : "border border-stone-300"}`}
+            className={`rounded-full px-4 py-2 text-sm ${mode === v ? 'bg-stone-900 text-white' : 'border border-stone-300'}`}
           >
-            {v === "all" ? "전체" : v === "due" ? "다시 보기" : "알고 있음"}
+            {v === 'all' ? '전체' : v === 'due' ? '다시 보기' : '알고 있음'}
           </button>
         ))}
         <button
@@ -1181,28 +1172,24 @@ export default function RadicalFlashcardsPage() {
       </div>
       <section className="min-h-[350px] rounded-3xl border bg-white p-8 text-center shadow-sm dark:border-stone-700 dark:bg-stone-900">
         <div className="text-sm text-stone-500">
-          {pool.length
-            ? `${(index % pool.length) + 1} / ${pool.length}`
-            : "복습할 카드가 없습니다"}
+          {pool.length ? `${(index % pool.length) + 1} / ${pool.length}` : '복습할 카드가 없습니다'}
         </div>
         <div className="mt-8 text-8xl font-bold">{card.radical}</div>
         <div className="mt-6 min-h-16 text-lg">
           {revealed ? (
             <>
               <strong>{card.hint}</strong>
-              <p className="mt-2 text-sm text-stone-500">
-                강희자전 {card.id}번 · 부수 전용 문자
-              </p>
+              <p className="mt-2 text-sm text-stone-500">강희자전 {card.id}번 · 부수 전용 문자</p>
             </>
           ) : (
-            "의미를 떠올린 뒤 정답 보기를 누르세요"
+            '의미를 떠올린 뒤 정답 보기를 누르세요'
           )}
         </div>
         <button
           onClick={() => setRevealed((v) => !v)}
           className="mt-8 rounded-xl bg-teal-600 px-6 py-3 font-semibold text-white"
         >
-          {revealed ? "다시 가리기" : "정답 보기"}
+          {revealed ? '다시 가리기' : '정답 보기'}
         </button>
       </section>
       <div className="mt-5 grid grid-cols-2 gap-3">
@@ -1245,11 +1232,7 @@ export default function RadicalFlashcardsPage() {
                   <td className="px-4 py-2 text-2xl">{x.radical}</td>
                   <td className="px-4 py-2">{x.hint}</td>
                   <td className="px-4 py-2 text-xs">
-                    {known.includes(x.id)
-                      ? "완료"
-                      : due.includes(x.id)
-                        ? "복습"
-                        : "미학습"}
+                    {known.includes(x.id) ? '완료' : due.includes(x.id) ? '복습' : '미학습'}
                   </td>
                 </tr>
               ))}
@@ -1258,9 +1241,9 @@ export default function RadicalFlashcardsPage() {
         </div>
       </section>
       <p className="mt-6 text-sm text-stone-500">
-        학습 순서: 하루 10개 → 다음 날 다시 보기 → 3일 뒤 복습. 부수는 의미
-        힌트이지 한자 뜻을 항상 결정하지는 않습니다.
+        학습 순서: 하루 10개 → 다음 날 다시 보기 → 3일 뒤 복습. 부수는 의미 힌트이지 한자 뜻을 항상
+        결정하지는 않습니다.
       </p>
     </main>
-  );
+  )
 }

@@ -175,7 +175,12 @@ export default function BjtVocabularyPage() {
           BJT 1,500 Vocabulary Project
         </p>
         <h1 className="text-4xl font-bold tracking-tight">비즈니스 일본어 암기장</h1>
-        <a href="/japan/radicals" className="mt-4 inline-block rounded-full border border-teal-600 px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50">한자 부수 플래시카드 214</a>
+        <a
+          href="/japan/radicals"
+          className="mt-4 inline-block rounded-full border border-teal-600 px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50"
+        >
+          한자 부수 플래시카드 214
+        </a>
         <p className="mt-4 text-stone-600 dark:text-stone-300">
           단어를 외우기보다 한자 조합과 업무 문맥을 회상하세요. 현재 1차 핵심 세트 100개를 제공하며,
           모든 단어에 히라가나 발음을 함께 표시합니다.

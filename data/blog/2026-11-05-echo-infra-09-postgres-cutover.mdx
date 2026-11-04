@@ -1,0 +1,36 @@
+---
+title: "Echo 인프라 09 — PostgreSQL Logical Replication · PgBouncer · Cutover · Failback"
+date: '2026-11-05'
+tags: ['cloud', 'infrastructure', 'echo', 'troubleshooting']
+draft: false
+summary: "기존 DB 이전 PoC를 실제 EKS·GKE 경로로 확장하면서 TLS·네트워크·키 권한·구독 스크립트 문제를 해결했습니다. 이전 알고리즘 전체를 처음부터 만들었다고 말하지 않습니다."
+category: development
+---
+
+[Echo 인프라 시리즈 전체 목차](/blog/2026-11-05-echo-infra-series)
+
+> 2026년 11월 4일 기준 해커톤 구현 회고입니다. 당시 코드와 작업 기록을 기준으로 정리했으며, 현재 서비스 상태나 모든 환경에 적용되는 설정을 보장하지 않습니다.
+
+## 기술 명칭과 설명
+
+논리 복제는 PostgreSQL 변경을 publication/subscription으로 다른 DB에 전달하는 방식입니다. PgBouncer는 DB 연결 풀러입니다. Cutover는 실제 쓰기 대상 전환, Rollback은 문제가 난 전환을 되돌리는 것이며, 갑작스런 원본 DB 장애에서 대상을 승격하는 Failover와는 구분합니다.
+
+## 내가 무엇을 했는가
+
+데이터 담당의 기존 로컬 PoC와 AWS 1차안 위에 GCP B PostgreSQL·PgBouncer 매니페스트, 상대 NAT만 허용하는 cross-cloud 노출, TLS 패치와 적용 절차를 추가했습니다. 실제 클러스터용 구독·지연·컷오버·롤백·정합성 스크립트, 부하 리허설과 echo_monitor 계정·Secret Manager 껍데기를 구현했습니다.
+
+## 트러블슈팅: 문제 → 원인/판단 → 조치
+
+① PostgreSQL 프로세스가 root 소유 0600 TLS 키를 읽지 못하는 권한 문제에 대해 93e71ec에서 fsGroup 999와 0640으로 조정했습니다. ② CREATE SUBSCRIPTION의 psql 변수가 -c 경로에서 치환되지 않아 1bfe59d에서 SQL을 stdin으로 전달했습니다. 구독·컷오버·롤백 세 경로를 함께 수정했습니다.
+
+## 해결 결과와 아직 남은 한계
+
+11/4 문서에 A→B streaming과 테이블 ready가 기록되어 있습니다. 실제 cross-cloud 쓰기 정지·복귀 시간은 TBD입니다. 로컬 0.30초·0.46초·누락0은 데이터 담당 PoC이며 본인 실측이 아닙니다. PgBouncer backend 변경의 ConfigMap 영속화, A→B PgBouncer 연결 TLS, 자동 이전 계획과 컷오버 통합은 후속입니다. sslmode=require는 암호화만으로 서버 신원 검증까지 완성한 설정은 아닙니다.
+
+## 발표·면접에서 설명할 문장
+
+> 기존 DB 이전 PoC를 실제 EKS·GKE 경로로 확장하면서 TLS·네트워크·키 권한·구독 스크립트 문제를 해결했습니다. 이전 알고리즘 전체를 처음부터 만들었다고 말하지 않습니다.
+
+## 기여 범위와 검증 기준
+
+본인 작성의 비병합 커밋과 변경 내용을 대조했습니다. 코드 구현, 적용 기록, 실측 결과는 구분합니다. 팀원이 만든 기반을 확장한 작업은 그 경계를 본문에 명시했고, 목표 수치는 완료 성과로 표현하지 않았습니다. 운영 경로와 식별자는 공개본에서 생략했습니다.

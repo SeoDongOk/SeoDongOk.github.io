@@ -1,0 +1,71 @@
+---
+title: 'Echo 인프라 구축 회고 — 기술 개념부터 직접 구현과 트러블슈팅까지'
+date: '2026-11-05'
+tags: ['cloud', 'infrastructure', 'echo', 'troubleshooting']
+draft: false
+summary: 'AWS·GCP 실행 기반부터 Envoy 트래픽 제어, 신원연합, 관측, DB 실배선까지. 기술별 10편으로 직접 한 일과 문제 해결, 검증의 한계를 정리한다.'
+category: development
+---
+
+해커톤에서 맡은 인프라 작업을 기술별로 나눠 정리했다. 기술 이름만 나열하기보다 **무엇인지 → 왜 필요했는지 → 무엇을 구현했는지 → 어디서 막혔는지 → 무엇이 아직 남았는지**를 설명하는 것이 목표다.
+
+AWS 도쿄·GCP 서울의 실행 기반을 Terraform으로 구성하고, 고정 진입점의 트래픽 제어와 관측을 구현했다. 기존 데이터 이전 PoC를 실제 클러스터에 연결할 네트워크·TLS·스크립트를 확장했고, 관제탑의 신원과 비밀 전달 기반을 준비했다.
+
+## 기술별 10편
+
+### [Echo 인프라 01 — Terraform · IaC · Remote State](/blog/2026-11-05-echo-infra-01-terraform-state)
+
+클라우드 환경을 코드로 관리하면서, 검사 단계와 실제 자격 증명이 필요한 적용 단계를 분리했습니다.
+
+### [Echo 인프라 02 — Amazon VPC · Subnet · NAT Gateway · EKS · EBS CSI](/blog/2026-11-05-echo-infra-02-aws-eks)
+
+비공개 노드 기반 EKS를 구성했고, 노드 생성 정체를 계정 플랜의 인스턴스 실행 제약으로 좁혀 해결했습니다.
+
+### [Echo 인프라 03 — Google VPC · Cloud NAT · GKE · API Dependency](/blog/2026-11-05-echo-infra-03-gcp-gke)
+
+GCP 첫 구축에서 API 활성화 순서를 명시해, 이미 세팅된 프로젝트에서만 우연히 통과하는 코드를 피했습니다.
+
+### [Echo 인프라 04 — OIDC · AWS STS · IAM Role · Workload Identity Federation](/blog/2026-11-05-echo-infra-04-oidc-wif)
+
+장기 키 대신 단기 신원 교환 경로를 만들고, PR 검증 신원과 실제 빌드·배포 신원의 신뢰 범위를 나눴습니다.
+
+### [Echo 인프라 05 — Control Plane · Workload Identity · Secret Manager CSI · SecretSync](/blog/2026-11-05-echo-infra-05-control-plane-secrets)
+
+장애가 나는 출발 환경과 관제탑을 분리하고, 신원·비밀 전달·네트워크 기반까지만 책임 경계를 명시해 인수인계했습니다.
+
+### [Echo 인프라 06 — Envoy Proxy · L7 · xDS · Weighted Routing · Health Check](/blog/2026-11-05-echo-infra-06-envoy-routing)
+
+DNS는 대표 주소 역할에 두고 실제 클라우드 간 비율은 Envoy에서 제어해, 요청 건수로 전환 결과를 확인할 수 있게 했습니다.
+
+### [Echo 인프라 07 — Kubernetes Ingress · AWS ALB · ingress-nginx · ACM · TLS](/blog/2026-11-05-echo-infra-07-ingress-tls)
+
+공유 Ingress로 앱별 LB 생성을 줄이고, 프록시의 헬스체크 Host가 실제 라우팅 규칙과 다른 문제를 별도 상태 경로로 해결했습니다.
+
+### [Echo 인프라 08 — Prometheus · Grafana · Counter · Histogram · k6](/blog/2026-11-05-echo-infra-08-observability)
+
+화면용 지표와 자동 판정용 지표의 시간 특성이 다르다는 점을 반영해, 승격은 즉시 요청 카운터로 확인하도록 만들었습니다.
+
+### [Echo 인프라 09 — PostgreSQL Logical Replication · PgBouncer · Cutover · Failback](/blog/2026-11-05-echo-infra-09-postgres-cutover)
+
+기존 DB 이전 PoC를 실제 EKS·GKE 경로로 확장하면서 TLS·네트워크·키 권한·구독 스크립트 문제를 해결했습니다. 이전 알고리즘 전체를 처음부터 만들었다고 말하지 않습니다.
+
+### [Echo 인프라 10 — Multi-zone · Secondary Entry Point · Weight Synchronization](/blog/2026-11-05-echo-infra-10-entrypoint-ha)
+
+단일 진입점의 한계를 인식해 다른 존 보조 프록시와 가중치 동기화 PoC를 구현했고, 통합 카운터·제어 경로 고가용성은 남은 문제로 분리했습니다.
+
+## 본인 작업과 팀 작업의 경계
+
+- **데이터:** 논리 복제·컷오버·롤백의 초기 로컬 PoC는 데이터 담당 작업이다. 나는 실제 클러스터 배선과 스크립트 확장에 기여했다.
+- **API·실행기:** 자동 단계 판정과 통합 시연은 API 담당 영역이다. 나는 실행 기반·권한·관측 접점을 준비했다.
+- **온프레·보안:** 온프레 k3s·터널·실행기 정책, AI 샌드박스의 전체 구현은 내 단독 작업이 아니다.
+- **빌드:** 이미지 저장소·신원 기반 준비와 애플리케이션 저장소의 워크플로 구현은 별도 범위로 구분한다.
+
+## 성과 수치를 읽는 기준
+
+코드가 있다는 것과 실제 적용됐다는 것, 부하를 걸어 실측했다는 것은 다르다. 팀 통합 시연 수치는 개인 단독 성과가 아니며, 다른 담당의 로컬 PoC 결과를 실제 cross-cloud 성능으로 바꿔 말하지 않는다.
+
+실제 DB 컷오버의 쓰기 정지 시간, 보조 진입점 장애 전환 시간, 전체 환경 재구축 리허설처럼 아직 측정 근거가 없는 항목은 미검증으로 남긴다.
+
+## 읽는 순서
+
+처음이라면 01~03으로 실행 환경을 이해하고, 04~05로 신원·비밀 전달을 살펴본다. 06~08은 요청의 흐름과 관측, 09는 데이터 쓰기 대상 전환, 10은 진입점 자체의 장애 대응을 다룬다.

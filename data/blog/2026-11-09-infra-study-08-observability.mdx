@@ -1,0 +1,76 @@
+---
+title: '인프라 공부 08 — Prometheus · Grafana · Counter · Histogram · k6'
+date: '2026-11-09'
+tags: ['infrastructure', 'observability', 'prometheus', 'grafana', 'study']
+draft: false
+summary: '요청 수·오류율·p95를 Prometheus로 재는 법, Counter와 Histogram의 차이, rate() 창과 수집 간격이 맞지 않을 때 값이 비는 이유, 부하 도구로 숫자를 검증하는 습관을 정리한다.'
+category: infra
+---
+
+[인프라 공부 시리즈 목차](/blog/2026-11-09-infra-study-series)
+
+## 무엇을 재나
+
+서비스 상태를 볼 때 기본은 세 가지다.
+
+| 지표 | 질문 |
+|---|---|
+| 요청 수 (traffic) | 얼마나 들어오나 |
+| 오류율 (errors) | 그중 얼마나 실패하나 |
+| 지연 (latency, p95·p99) | 느린 쪽 요청은 얼마나 느린가 |
+
+여기에 포화도(CPU, 연결 수)를 더하면 흔히 말하는 네 가지 골든 시그널이다.
+
+## 지표 타입
+
+| 타입 | 성질 | 쓰는 법 |
+|---|---|---|
+| Counter | 계속 증가만 (재시작 때 0으로) | `rate()`로 초당 증가량 |
+| Gauge | 오르내림 | 현재 값 그대로 |
+| Histogram | 값을 구간(bucket)별로 셈 | `histogram_quantile()`로 p95 |
+
+```promql
+# 초당 요청 수
+sum(rate(http_requests_total[1m]))
+# 오류율
+sum(rate(http_requests_total{code=~"5.."}[1m])) / sum(rate(http_requests_total[1m]))
+# p95 지연
+histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))
+```
+
+평균 지연은 대부분의 요청이 빠르면 느린 요청을 숨긴다. 그래서 p95, p99를 본다.
+
+## rate() 창이 너무 짧으면 값이 빈다
+
+`rate()`는 창 안에 **점이 최소 두 개** 있어야 계산된다. 수집 간격이 5초인데 `rate(x[5s])`로 물으면 점이 하나뿐이라 결과가 비어 버린다. "지표 없음"이 장애로 오판될 수 있다.
+
+- 규칙: 창은 수집 간격의 **최소 4배**. 5초 수집이면 `[20s]` 이상, 보통 `[1m]`.
+- 짧은 시간 안의 판단이 필요하면, `rate()` 대신 **카운터 값을 직접 두 번 읽어 차이**를 내는 편이 정확하다.
+
+## 어디서 세는지 확인한다
+
+프록시는 같은 요청을 여러 곳에서 셀 수 있다. 예를 들어 우선순위 묶음(aggregate) 클러스터를 쓰면 오류·지연 통계가 실제 목적지가 아니라 **묶음 쪽에만** 기록되는 경우가 있다. 환경별 오류율 그래프가 늘 비어 있다면 지표 이름보다 "어느 단위에 기록되는가"를 먼저 의심한다.
+
+## 부하 도구로 숫자를 검증한다
+
+대시보드 숫자가 맞는지는 아는 양을 흘려 보고 확인한다.
+
+```javascript
+// k6: 초당 50건, 1분
+export const options = {
+  scenarios: { steady: { executor: 'constant-arrival-rate', rate: 50, timeUnit: '1s', duration: '1m', preAllocatedVUs: 20 } },
+};
+```
+
+k6가 보낸 건수(약 3,000건)와 프록시·대시보드가 센 건수가 맞는지 대조한다. 안 맞으면 수집·집계 어딘가가 틀린 것이다.
+
+## 원격 쓰기와 인증
+
+여러 곳의 지표를 한 Prometheus로 모을 때 `remote_write`를 쓴다. 이때 basic auth를 쓴다면 **TLS 없이 보내면 비밀번호가 평문**으로 간다. 그리고 보내는 대상 주소가 사라진 서버를 가리키고 있지 않은지 정기적으로 확인한다. 빈 IP를 나중에 다른 서버가 받으면 비밀번호가 그쪽으로 간다.
+
+## 체크리스트
+
+- [ ] 요청 수·오류율·p95를 PromQL로 쓸 수 있다
+- [ ] rate 창 ≥ 수집 간격 × 4
+- [ ] 지표가 어느 단위(경로/목적지)에 기록되는지 확인했다
+- [ ] 부하 도구로 아는 양을 흘려 숫자를 대조했다

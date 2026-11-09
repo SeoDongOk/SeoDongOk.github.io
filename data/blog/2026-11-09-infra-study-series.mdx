@@ -1,0 +1,52 @@
+---
+title: '인프라 공부 시리즈 — 클라우드 기반부터 트래픽·관측·데이터 전환까지'
+date: '2026-11-09'
+tags: ['infrastructure', 'cloud', 'kubernetes', 'study']
+draft: false
+summary: 'Terraform, AWS·GCP 네트워크와 쿠버네티스, 신원 연합과 비밀값, L7 프록시와 TLS, 관측, PostgreSQL 무중단 전환, 진입점 고가용성까지 10편으로 정리한 인프라 공부 노트.'
+category: infra
+---
+
+멀티 클라우드 환경을 직접 구성해 보면서 공부한 내용을 기술별로 정리했다. 각 글은 **개념 → 동작 원리 → 자주 막히는 지점 → 체크리스트** 순서다.
+
+## 기반
+
+### [01 — Terraform · IaC · Remote State](/blog/2026-11-09-infra-study-01-terraform-state)
+state가 무엇을 기억하는지, 원격 state와 잠금, plan 파일로 적용하기, drift와 import·state rm.
+
+### [02 — Amazon VPC · Subnet · NAT Gateway · EKS](/blog/2026-11-09-infra-study-02-aws-vpc-eks)
+공인·사설 서브넷, NAT로 나가는 길, VPC CNI가 파드에 IP를 주는 방식과 SNAT 함정.
+
+### [03 — Google VPC · Cloud NAT · GKE](/blog/2026-11-09-infra-study-03-gcp-vpc-gke)
+전역 VPC, 방화벽 규칙과 IAP, VPC 네이티브 주소, 릴리스 채널과 유지보수 제외.
+
+## 신원과 비밀
+
+### [04 — OIDC · STS · Workload Identity Federation](/blog/2026-11-09-infra-study-04-oidc-wif)
+장기 키 없이 CI와 다른 클라우드가 권한을 빌리는 법, 신뢰 조건 좁히기.
+
+### [05 — 쿠버네티스에서 비밀값 다루기](/blog/2026-11-09-infra-study-05-k8s-secrets)
+Secret의 실체, CSI 드라이버와 동기화, 워크로드 신원, IMDS와 승인 정책.
+
+## 트래픽
+
+### [06 — Envoy · 가중치 라우팅 · 타임아웃과 재시도](/blog/2026-11-09-infra-study-06-envoy-routing)
+DNS 대신 프록시에서 비율 제어, 동적 설정, 헬스체크, 504를 만드는 시도당 타임아웃.
+
+### [07 — Ingress · ALB · ingress-nginx · TLS 종단](/blog/2026-11-09-infra-study-07-ingress-tls)
+로드밸런서 공유, 출발지 제한, 구간별 TLS와 `require` vs `verify-full`.
+
+### [10 — 진입점 고가용성](/blog/2026-11-09-infra-study-10-entrypoint-ha)
+단일 장애점, 멀티존과 다른 리전 보조 진입점, 진입점 사이 설정 동기화.
+
+## 관측과 데이터
+
+### [08 — Prometheus · Grafana · k6](/blog/2026-11-09-infra-study-08-observability)
+요청 수·오류율·p95, rate 창과 수집 간격, 부하 도구로 숫자 검증.
+
+### [09 — PostgreSQL 논리 복제 · PgBouncer · 무중단 쓰기 전환](/blog/2026-11-09-infra-study-09-postgres-cutover)
+PAUSE·RESUME 전환 순서, 시퀀스·DDL 함정, 재접속 지연.
+
+## 이어서 읽기
+
+- [재해 복구 기초 시리즈](/blog/2026-11-08-dr-basics-01-replication-is-not-backup) — 복제와 백업, 정합성과 무결성, 랜섬웨어, DR 우선순위

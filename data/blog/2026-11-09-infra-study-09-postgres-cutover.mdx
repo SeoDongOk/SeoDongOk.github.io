@@ -1,0 +1,78 @@
+---
+title: '인프라 공부 09 — PostgreSQL 논리 복제 · PgBouncer · 무중단 쓰기 전환'
+date: '2026-11-09'
+tags: ['infrastructure', 'postgresql', 'replication', 'pgbouncer', 'study']
+draft: false
+summary: '논리 복제로 다른 곳에 DB 사본을 만들고, PgBouncer PAUSE·RESUME으로 쓰기 담당을 몇 초 만에 바꾸는 순서, 시퀀스·DDL 같은 함정과 재접속 지연 설정을 정리한다.'
+category: infra
+---
+
+[인프라 공부 시리즈 목차](/blog/2026-11-09-infra-study-series)
+
+## 물리 복제 vs 논리 복제
+
+| | 물리 복제 (스트리밍) | 논리 복제 |
+|---|---|---|
+| 보내는 것 | WAL 바이트 그대로 | WAL을 해석한 **행 변경** |
+| 대상 | 클러스터 전체 | 표 단위 선택 가능 |
+| 버전 | 같은 주 버전 | **달라도 됨** |
+| 사본 | 읽기 전용 대기 서버 | 쓰기 가능한 독립 DB |
+
+다른 클라우드, 다른 버전으로 옮기는 이전에는 논리 복제가 맞다.
+
+```sql
+-- 출발(원본)
+ALTER SYSTEM SET wal_level = logical;   -- 재시작 필요
+CREATE PUBLICATION app_pub FOR ALL TABLES;
+-- 도착(사본): 스키마를 먼저 만든 뒤
+CREATE SUBSCRIPTION app_sub CONNECTION 'host=... sslmode=verify-full' PUBLICATION app_pub;
+```
+
+## 논리 복제가 옮기지 않는 것
+
+| 안 옮겨지는 것 | 결과 | 대응 |
+|---|---|---|
+| DDL (표·칸 변경) | 원본에만 칸이 생기면 복제가 멈춤 | 양쪽에 같은 DDL을 먼저 |
+| **시퀀스 값** | 사본으로 전환 뒤 새 행에서 기본 키 충돌 | 전환 시점에 `setval`로 맞춤 |
+| 새 표 | 구독이 모름 | 사본에 표를 만들고 `ALTER SUBSCRIPTION … REFRESH PUBLICATION` |
+
+## 쓰기 전환 순서
+
+쓰기 담당을 A에서 B로 옮기는 핵심은 "**A에 새 쓰기가 들어오지 않는 짧은 창**"을 만드는 것이다. 앱 앞에 커넥션 풀러 PgBouncer를 두면 이 창을 만들 수 있다.
+
+1. **PAUSE**: PgBouncer가 새 쿼리를 붙잡아 둔다(실패시키지 않고 대기).
+2. **따라잡기 확인**: A의 현재 WAL 위치 ≤ B가 확인한 위치(`pg_replication_slots.confirmed_flush_lsn`)가 될 때까지 기다린다.
+3. **대조**: 양쪽 행 수·번호(누락·중복)를 확인한다.
+4. **시퀀스 맞추기**, 필요하면 **역방향 구독** 생성(복귀용, `copy_data = false`).
+5. **PgBouncer 대상 변경** → B.
+6. **RESUME**: 붙잡혀 있던 쿼리가 B로 흘러간다.
+
+손님 입장에서는 실패가 아니라 **수 초의 지연**으로 보인다. 정지 창이 짧을수록 좋고, 그 시간을 재서 기록한다.
+
+## 정지 창 바깥의 지연을 조심한다
+
+창 자체는 10초인데 손님은 20초 넘게 기다리는 경우가 있다. 흔한 원인 두 가지.
+
+- **PgBouncer 재접속 대기:** 서버 연결에 실패한 뒤 다시 시도하기까지 기다리는 `server_login_retry` 기본값이 15초다. 전환 중 한 번 실패했다면 RESUME 뒤에도 15초를 더 기다린다. 1초 정도로 줄인다.
+- **앞단 타임아웃:** 프록시의 시도당 타임아웃이 정지 창보다 짧으면 504가 난다([6편](/blog/2026-11-09-infra-study-06-envoy-routing)).
+
+## 복제 연결도 TLS로
+
+복제 연결은 DB 전체 데이터가 지나가는 길이다. `sslmode=require`는 암호화만 하고 서버를 검증하지 않는다. `verify-full`로, 그리고 원본 `pg_hba.conf`에서 복제 사용자의 비TLS 접속을 거부한다.
+
+```
+hostnossl all repl_user all reject
+hostssl   app repl_user all scram-sha-256
+```
+
+## 복제는 백업이 아니다
+
+논리 복제는 DELETE·TRUNCATE도 그대로 보낸다. 사본은 "지금 상태"이지 "과거 시점"이 아니다. 백업은 따로 둔다([재해 복구 기초 1](/blog/2026-11-08-dr-basics-01-replication-is-not-backup)).
+
+## 체크리스트
+
+- [ ] DDL은 양쪽에 먼저, 새 표는 REFRESH
+- [ ] 전환 순서에 시퀀스 맞추기가 있다
+- [ ] PAUSE → 따라잡기 확인 → 대조 → 전환 → RESUME
+- [ ] `server_login_retry`와 프록시 타임아웃을 정지 창에 맞췄다
+- [ ] 복제 연결은 `verify-full`, 비TLS 거부

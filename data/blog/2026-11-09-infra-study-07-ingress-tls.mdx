@@ -1,0 +1,69 @@
+---
+title: '인프라 공부 07 — Kubernetes Ingress · AWS ALB · ingress-nginx · TLS 종단'
+date: '2026-11-09'
+tags: ['infrastructure', 'kubernetes', 'ingress', 'tls', 'study']
+draft: false
+summary: 'Service와 Ingress의 차이, AWS Load Balancer Controller와 ingress-nginx, 여러 서비스가 로드밸런서 하나를 나눠 쓰는 법, TLS를 어디서 끊는지와 평문으로 남는 구간을 정리한다.'
+category: infra
+---
+
+[인프라 공부 시리즈 목차](/blog/2026-11-09-infra-study-series)
+
+## Service와 Ingress
+
+| | Service (LoadBalancer 타입) | Ingress |
+|---|---|---|
+| 계층 | L4 (TCP) | L7 (HTTP) |
+| 로드밸런서 수 | Service마다 하나 | 여러 서비스가 **하나를 공유** |
+| 라우팅 | 포트 단위 | 호스트·경로 단위 |
+
+서비스가 열 개면 L4 로드밸런서 열 개는 비용과 관리 부담이 크다. Ingress는 "`a.example.com`은 서비스 A, `b.example.com`은 서비스 B"처럼 하나의 입구에서 나눈다.
+
+## Ingress 컨트롤러
+
+Ingress 리소스는 선언일 뿐이고, 실제로 만드는 것은 컨트롤러다.
+
+| 컨트롤러 | 만드는 것 | 특징 |
+|---|---|---|
+| AWS Load Balancer Controller | AWS ALB | `group.name` 주석으로 여러 Ingress가 ALB 하나를 공유. ACM 인증서 연동 |
+| ingress-nginx | 클러스터 안 nginx + 앞단 L4 LB | 클라우드 중립. 내부 LB로 두면 VPC 안에서만 접근 |
+
+ALB를 여러 Ingress가 공유할 때는 **기본 규칙만 가진 "닻" Ingress**를 하나 두는 방법이 있다. 앱 Ingress가 모두 지워져도 ALB가 사라지지 않아 주소가 유지된다.
+
+## 출발지 제한
+
+로드밸런서를 공개로 두더라도 앞단 프록시에서만 들어오게 하고 싶을 때가 있다.
+
+- ALB: `alb.ingress.kubernetes.io/inbound-cidrs` 로 허용 대역 지정
+- 내부 LB: 아예 VPC 안에서만 접근 가능
+
+허용 목록에 IP를 직접 넣으면, 그 IP가 바뀔 때 고칠 곳이 늘어난다. 어디에 어떤 IP를 넣었는지 목록을 남긴다.
+
+## TLS는 어디서 끊나
+
+손님 → CDN → 프록시 → 로드밸런서 → 앱 → DB처럼 홉이 많으면 **각 구간이 따로** 암호화돼야 한다.
+
+| 구간 | 흔한 함정 |
+|---|---|
+| 손님 → CDN | CDN은 HTTPS인데 CDN → 원점이 HTTP인 "Flexible" 모드 |
+| 프록시 → 로드밸런서 | 로드밸런서에 443과 인증서가 있어도 프록시가 80으로 보냄 |
+| 앱 → DB | 연결 문자열에 `sslmode`가 없음 |
+| DB 복제 | `sslmode=require`: 암호화는 되지만 **서버 인증서를 검증하지 않음** |
+
+`require`와 `verify-full`의 차이가 중요하다. `require`는 도청은 막지만, 중간에서 다른 서버가 끼어드는 것(중간자)은 못 막는다. `verify-full`은 CA로 인증서를 검증하고 호스트 이름까지 맞춘다.
+
+## 인증서 발급
+
+| 방법 | 쓰는 곳 |
+|---|---|
+| ACM | AWS 로드밸런서 (인증서를 내보낼 수 없음, 자동 갱신) |
+| cert-manager + Let's Encrypt | 클러스터 안 (ingress-nginx 등). 와일드카드는 DNS-01 검증 필요 |
+
+DNS-01 검증은 DNS 레코드를 만들 수 있는 API 토큰이 필요하다. 그 토큰의 권한을 영역 하나, 레코드 편집만으로 좁힌다.
+
+## 체크리스트
+
+- [ ] 서비스 수만큼 L4 LB를 만들지 않고 Ingress로 공유한다
+- [ ] 공유 LB가 앱 삭제와 함께 사라지지 않게 했다
+- [ ] 구간별로 TLS 여부를 표로 그려 봤다
+- [ ] 내부 구간도 `verify-full`을 목표로 한다

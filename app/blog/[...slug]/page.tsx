@@ -6,6 +6,7 @@ import { components } from '@/components/MDXComponents'
 import { MDXLayoutRenderer } from 'pliny/mdx-components'
 import { sortPosts, coreContent, allCoreContent } from 'pliny/utils/contentlayer'
 import { allBlogs, allAuthors } from 'contentlayer/generated'
+import { listedBlogs } from 'lib/listedBlogs'
 import type { Authors, Blog } from 'contentlayer/generated'
 import PostSimple from '@/layouts/PostSimple'
 import PostLayout from '@/layouts/PostLayout'
@@ -52,6 +53,7 @@ export async function generateMetadata(props: {
   return {
     title: post.title,
     description: post.summary,
+    ...(post.unlisted ? { robots: { index: false, follow: false } } : {}),
     openGraph: {
       title: post.title,
       description: post.summary,
@@ -80,16 +82,17 @@ export const generateStaticParams = async () => {
 export default async function Page(props: { params: Promise<{ slug: string[] }> }) {
   const params = await props.params
   const slug = decodeURI(params.slug.join('/'))
+  const post = allBlogs.find((p) => p.slug === slug) as Blog
   // Filter out drafts in production
-  const sortedCoreContents = allCoreContent(sortPosts(allBlogs))
-  const postIndex = sortedCoreContents.findIndex((p) => p.slug === slug)
-  if (postIndex === -1) {
+  if (!post || (process.env.NODE_ENV === 'production' && post.draft === true)) {
     return notFound()
   }
 
-  const prev = sortedCoreContents[postIndex + 1]
-  const next = sortedCoreContents[postIndex - 1]
-  const post = allBlogs.find((p) => p.slug === slug) as Blog
+  // unlisted 글은 이전·다음 이동에 넣지 않는다
+  const sortedCoreContents = allCoreContent(sortPosts(listedBlogs))
+  const postIndex = sortedCoreContents.findIndex((p) => p.slug === slug)
+  const prev = postIndex === -1 ? undefined : sortedCoreContents[postIndex + 1]
+  const next = postIndex === -1 ? undefined : sortedCoreContents[postIndex - 1]
   const authorList = post?.authors || ['default']
   const authorDetails = authorList.map((author) => {
     const authorResults = allAuthors.find((p) => p.slug === author)

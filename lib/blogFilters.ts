@@ -1,5 +1,5 @@
 import { allCoreContent, sortPosts } from 'pliny/utils/contentlayer'
-import { allBlogs } from 'contentlayer/generated'
+import { listedBlogs as allBlogs } from 'lib/listedBlogs'
 
 const quantTerms = [
   'quantitative-trading',
